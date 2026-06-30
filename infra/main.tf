@@ -27,8 +27,14 @@ provider "aws" {
 data "aws_caller_identity" "current" {}
 data "aws_region" "current" {}
 
-# Modules are wired in as each phase lands (see tasks/plan.md):
-#   module "storage"    { source = "./modules/storage" ... }    # Task 1
+module "storage" {
+  source = "./modules/storage"
+
+  project_name = var.project_name
+  account_id   = data.aws_caller_identity.current.account_id
+}
+
+# Modules wired in as each phase lands (see tasks/plan.md):
 #   module "messaging"  { source = "./modules/messaging" ... }  # Task 2
 #   module "lambdas"    { source = "./modules/lambdas" ... }    # Tasks 4,7,8
 #   module "api"        { source = "./modules/api" ... }        # Tasks 4,8

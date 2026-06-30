@@ -17,3 +17,15 @@ output "region" {
   description = "AWS region the stack is deployed into."
   value       = data.aws_region.current.name
 }
+
+# --- Storage (Task 1) ---
+
+output "image_bucket_name" {
+  description = "S3 bucket for uploaded ingredient images."
+  value       = module.storage.image_bucket_name
+}
+
+output "results_table_name" {
+  description = "DynamoDB table storing request results."
+  value       = module.storage.results_table_name
+}
