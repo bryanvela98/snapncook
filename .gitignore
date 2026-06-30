@@ -1,5 +1,37 @@
+# Project planning / local-only docs
 /tasks
 .claude
 CLAUDE.md
 /docs
 *.pdf
+
+# Terraform
+**/.terraform/
+*.tfstate
+*.tfstate.*
+crash.log
+crash.*.log
+override.tf
+override.tf.json
+*_override.tf
+*_override.tf.json
+.terraformrc
+terraform.rc
+# Keep terraform.tfvars tracked (no secrets in it); ignore local autovars
+*.auto.tfvars
+
+# Lambda packaging
+*.zip
+
+# Python
+__pycache__/
+*.py[cod]
+.pytest_cache/
+.coverage
+htmlcov/
+.venv/
+venv/
+
+# Secrets / env
+.env
+.env.*
