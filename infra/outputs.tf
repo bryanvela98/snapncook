@@ -41,3 +41,10 @@ output "job_dlq_url" {
   description = "URL of the SQS dead-letter queue."
   value       = module.messaging.dlq_url
 }
+
+# --- API (Task 4) ---
+
+output "api_endpoint" {
+  description = "Base URL for all API routes (e.g. POST <api_endpoint>/analyze)."
+  value       = module.api.api_endpoint
+}

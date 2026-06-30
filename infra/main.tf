@@ -40,6 +40,26 @@ module "messaging" {
   project_name = var.project_name
 }
 
+module "lambdas" {
+  source = "./modules/lambdas"
+
+  project_name       = var.project_name
+  image_bucket_name  = module.storage.image_bucket_name
+  image_bucket_arn   = module.storage.image_bucket_arn
+  results_table_name = module.storage.results_table_name
+  results_table_arn  = module.storage.results_table_arn
+  job_queue_url      = module.messaging.queue_url
+  job_queue_arn      = module.messaging.queue_arn
+}
+
+module "api" {
+  source = "./modules/api"
+
+  project_name         = var.project_name
+  ingest_invoke_arn    = module.lambdas.ingest_invoke_arn
+  ingest_function_name = module.lambdas.ingest_function_name
+}
+
 # Modules wired in as each phase lands (see tasks/plan.md):
 #   module "lambdas"    { source = "./modules/lambdas" ... }    # Tasks 4,7,8
 #   module "api"        { source = "./modules/api" ... }        # Tasks 4,8
