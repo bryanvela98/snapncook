@@ -29,3 +29,15 @@ output "results_table_name" {
   description = "DynamoDB table storing request results."
   value       = module.storage.results_table_name
 }
+
+# --- Messaging (Task 2) ---
+
+output "job_queue_url" {
+  description = "URL of the SQS job queue."
+  value       = module.messaging.queue_url
+}
+
+output "job_dlq_url" {
+  description = "URL of the SQS dead-letter queue."
+  value       = module.messaging.dlq_url
+}

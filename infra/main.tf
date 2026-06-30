@@ -34,8 +34,13 @@ module "storage" {
   account_id   = data.aws_caller_identity.current.account_id
 }
 
+module "messaging" {
+  source = "./modules/messaging"
+
+  project_name = var.project_name
+}
+
 # Modules wired in as each phase lands (see tasks/plan.md):
-#   module "messaging"  { source = "./modules/messaging" ... }  # Task 2
 #   module "lambdas"    { source = "./modules/lambdas" ... }    # Tasks 4,7,8
 #   module "api"        { source = "./modules/api" ... }        # Tasks 4,8
 #   module "frontend"   { source = "./modules/frontend" ... }   # Task 9
