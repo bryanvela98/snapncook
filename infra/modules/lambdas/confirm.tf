@@ -52,9 +52,9 @@ resource "aws_iam_role_policy" "confirm" {
         Resource = var.job_queue_arn
       },
       {
-        Sid    = "CloudWatchLogs"
-        Effect = "Allow"
-        Action = ["logs:CreateLogStream", "logs:PutLogEvents"]
+        Sid      = "CloudWatchLogs"
+        Effect   = "Allow"
+        Action   = ["logs:CreateLogStream", "logs:PutLogEvents"]
         Resource = "${aws_cloudwatch_log_group.confirm.arn}:*"
       }
     ]
