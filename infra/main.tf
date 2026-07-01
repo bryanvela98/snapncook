@@ -8,6 +8,7 @@
 # Created: 2026-06-30
 # Last Modified:
 #     2026-06-30 - File created: provider config + scaffold (no resources yet).
+#     2026-07-01 - Wired in frontend module (Task 9).
 # =============================================================================
 
 provider "aws" {
@@ -65,8 +66,13 @@ module "api" {
   query_function_name  = module.lambdas.query_function_name
 }
 
+module "frontend" {
+  source = "./modules/frontend"
+
+  project_name = var.project_name
+  account_id   = data.aws_caller_identity.current.account_id
+  api_endpoint = module.api.api_endpoint
+}
+
 # Modules wired in as each phase lands (see tasks/plan.md):
-#   module "lambdas"    { source = "./modules/lambdas" ... }    # Tasks 4,7,8
-#   module "api"        { source = "./modules/api" ... }        # Tasks 4,8
-#   module "frontend"   { source = "./modules/frontend" ... }   # Task 9
 #   module "monitoring" { source = "./modules/monitoring" ... } # Task 11

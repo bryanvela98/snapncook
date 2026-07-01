@@ -1,0 +1,141 @@
+<!--
+  Description: Single-page frontend for Snap & Cook. Three main states managed
+               by app.js: upload form, loading/polling, and recipe card grid.
+               config.js is loaded first so window.API_BASE_URL is always set
+               before app.js runs. No client-side framework — vanilla HTML/JS.
+  Last Modified By: bvela
+  Created: 2026-07-01
+  Last Modified:
+      2026-07-01 - File created.
+-->
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta name="description" content="Upload a photo of your ingredients and get AI-generated recipe suggestions." />
+    <title>Snap &amp; Cook — AI Recipe Generator</title>
+    <link rel="stylesheet" href="styles.css" />
+    <!-- config.js must load before app.js so API_BASE_URL is available -->
+    <script src="config.js"></script>
+  </head>
+  <body>
+
+    <header class="site-header" role="banner">
+      <h1>🍳 Snap &amp; Cook</h1>
+      <p>Photograph your ingredients — get two recipes instantly</p>
+    </header>
+
+    <main role="main">
+
+      <!-- ======================================================
+           Upload section
+           ====================================================== -->
+      <section id="upload-section" class="upload-section" aria-label="Upload a food photo">
+        <h2>What's in your fridge?</h2>
+
+        <form id="upload-form" novalidate>
+          <div
+            id="drop-zone"
+            class="drop-zone"
+            role="region"
+            aria-label="Image drop zone — drag and drop or click to browse"
+          >
+            <span class="drop-zone-icon" aria-hidden="true">📷</span>
+            <p class="drop-zone-text">
+              <strong>Drop a photo here</strong> or click to browse
+            </p>
+            <p class="drop-zone-hint">Accepts JPEG, PNG, WEBP — up to 10 MB</p>
+
+            <input
+              type="file"
+              id="file-input"
+              class="file-input"
+              accept="image/*"
+              aria-label="Select an image file"
+            />
+
+            <!-- Preview shown after file selection -->
+            <div id="file-preview" class="file-preview hidden" aria-live="polite">
+              <img id="preview-img" src="" alt="Selected image preview" />
+              <span id="preview-name" class="file-preview-name"></span>
+            </div>
+          </div>
+
+          <div class="upload-actions" style="margin-top: 1rem;">
+            <button
+              type="submit"
+              id="submit-btn"
+              class="btn btn-primary"
+              disabled
+              aria-label="Analyze ingredients and generate recipes"
+            >
+              Analyze Ingredients
+            </button>
+          </div>
+        </form>
+      </section>
+
+      <!-- ======================================================
+           Loading section
+           ====================================================== -->
+      <section
+        id="loading-section"
+        class="loading-section hidden"
+        aria-label="Processing"
+        aria-live="polite"
+        aria-busy="true"
+      >
+        <div class="spinner" role="status" aria-label="Loading"></div>
+        <p id="loading-text" class="loading-text">Uploading image…</p>
+      </section>
+
+      <!-- ======================================================
+           Results section
+           ====================================================== -->
+      <section
+        id="results-section"
+        class="results-section hidden"
+        aria-label="Generated recipes"
+        aria-live="polite"
+      >
+        <div class="results-header">
+          <h2>Your Recipes</h2>
+          <button id="copy-link-btn" class="btn btn-ghost" aria-label="Copy shareable link to these recipes">
+            🔗 Copy Shareable Link
+          </button>
+        </div>
+
+        <!-- Detected ingredients -->
+        <div id="ingredients-section" class="ingredients-section hidden">
+          <h3>Detected Ingredients</h3>
+          <div id="ingredient-tags" class="ingredient-tags" aria-label="Detected ingredients"></div>
+        </div>
+
+        <!-- Recipe cards -->
+        <div id="recipe-grid" class="recipe-grid" aria-label="Recipe cards"></div>
+      </section>
+
+      <!-- ======================================================
+           Error section
+           ====================================================== -->
+      <section
+        id="error-section"
+        class="error-section hidden"
+        role="alert"
+        aria-label="Error"
+      >
+        <span class="error-icon" aria-hidden="true">⚠️</span>
+        <p class="error-title">Something went wrong</p>
+        <p id="error-message" class="error-message"></p>
+        <button id="retry-btn" class="btn btn-primary">Try Again</button>
+      </section>
+
+    </main>
+
+    <!-- Toast notification (clipboard feedback) -->
+    <div id="toast" class="toast" role="status" aria-live="polite"></div>
+
+    <script src="app.js"></script>
+  </body>
+</html>

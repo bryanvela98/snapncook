@@ -6,6 +6,7 @@
 # Created: 2026-06-30
 # Last Modified:
 #     2026-06-30 - File created (placeholder — outputs added per phase).
+#     2026-07-01 - Added website_url output (Task 9).
 # =============================================================================
 
 output "account_id" {
@@ -47,4 +48,11 @@ output "job_dlq_url" {
 output "api_endpoint" {
   description = "Base URL for all API routes (e.g. POST <api_endpoint>/analyze)."
   value       = module.api.api_endpoint
+}
+
+# --- Frontend (Task 9) ---
+
+output "website_url" {
+  description = "Public URL of the S3 static website frontend."
+  value       = module.frontend.website_url
 }

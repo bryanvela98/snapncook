@@ -35,3 +35,6 @@ venv/
 # Secrets / env
 .env
 .env.*
+
+# OS
+.DS_Store
