@@ -14,6 +14,8 @@
  *     2026-07-01 - File created.
  *     2026-07-01 - Added preferences form, ingredient verification step,
  *                  POST /confirm flow.
+ *     2026-07-01 - Added settings panel (gear icon): API URL + key persisted
+ *                  to localStorage, override config.js at runtime.
  */
 
 /* ============================================================
@@ -22,6 +24,53 @@
 
 const POLL_INTERVAL_MS   = 2000;
 const POLL_TIMEOUT_MS    = 60000;
+
+const LS_KEY_API_URL = "snapcook_api_url";
+const LS_KEY_API_KEY = "snapcook_api_key";
+
+/* ============================================================
+   Settings helpers — localStorage overrides config.js
+   ============================================================ */
+
+/**
+ * Returns the active API base URL. localStorage value takes priority over
+ * window.API_BASE_URL (injected from config.js by Terraform).
+ *
+ * @returns {string}
+ */
+function getApiUrl() {
+  return localStorage.getItem(LS_KEY_API_URL) || window.API_BASE_URL || "";
+}
+
+/**
+ * Returns the stored API key, or an empty string if not set.
+ *
+ * @returns {string}
+ */
+function getApiKey() {
+  return localStorage.getItem(LS_KEY_API_KEY) || "";
+}
+
+/**
+ * Thin wrapper around fetch() that injects the API URL prefix and, if set,
+ * the x-api-key header on every request.
+ *
+ * @param {string} path - Path relative to the API base URL (e.g. "/analyze").
+ * @param {RequestInit} [options] - Standard fetch options.
+ * @returns {Promise<Response>}
+ */
+function apiFetch(path, options = {}) {
+  const url = `${getApiUrl()}${path}`;
+  const key = getApiKey();
+
+  if (key) {
+    const headers = new Headers(options.headers || {});
+    headers.set("x-api-key", key);
+    options = { ...options, headers };
+  }
+
+  return fetch(url, options);
+}
 
 /* ============================================================
    State
@@ -91,7 +140,19 @@ function init() {
     errorMessage:      document.getElementById("error-message"),
     retryBtn:          document.getElementById("retry-btn"),
     toast:             document.getElementById("toast"),
+    // Settings panel
+    settingsBtn:         document.getElementById("settings-btn"),
+    settingsOverlay:     document.getElementById("settings-overlay"),
+    settingsClose:       document.getElementById("settings-close"),
+    settingsApiUrl:      document.getElementById("settings-api-url"),
+    settingsApiKey:      document.getElementById("settings-api-key"),
+    toggleKeyVisibility: document.getElementById("toggle-key-visibility"),
+    settingsSave:        document.getElementById("settings-save"),
+    settingsClear:       document.getElementById("settings-clear"),
+    settingsStatus:      document.getElementById("settings-status"),
   };
+
+  initSettings();
 
   // Range slider live update
   dom.recipeCountInput.addEventListener("input", () => {
@@ -217,7 +278,7 @@ async function handleUpload(event) {
   formData.append("image", file);
 
   try {
-    const response = await fetch(`${window.API_BASE_URL}/analyze`, {
+    const response = await apiFetch("/analyze", {
       method: "POST",
       body: formData,
     });
@@ -274,7 +335,7 @@ async function poll(requestId) {
   }
 
   try {
-    const response = await fetch(`${window.API_BASE_URL}/recipes/${requestId}`);
+    const response = await apiFetch(`/recipes/${requestId}`);
 
     if (response.status === 404) return; // not yet written — keep waiting
 
@@ -404,8 +465,8 @@ async function handleConfirm() {
   pollingTarget = "COMPLETE";
 
   try {
-    const response = await fetch(
-      `${window.API_BASE_URL}/recipes/${currentRequestId}/confirm`,
+    const response = await apiFetch(
+      `/recipes/${currentRequestId}/confirm`,
       {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -628,6 +689,130 @@ function showToast(message) {
   dom.toast.textContent = message;
   dom.toast.classList.add("visible");
   setTimeout(() => dom.toast.classList.remove("visible"), 2500);
+}
+
+/* ============================================================
+   Settings panel
+   ============================================================ */
+
+/**
+ * Wires the settings panel open/close logic, pre-fills saved values, and
+ * handles save/clear actions.
+ */
+function initSettings() {
+  // Pre-fill with whatever is already saved in localStorage
+  _refreshSettingsFields();
+  _updateSettingsIndicator();
+
+  dom.settingsBtn.addEventListener("click", openSettings);
+  dom.settingsClose.addEventListener("click", closeSettings);
+
+  // Close on overlay backdrop click (outside the panel)
+  dom.settingsOverlay.addEventListener("click", (e) => {
+    if (e.target === dom.settingsOverlay) closeSettings();
+  });
+
+  // Close on Escape key
+  document.addEventListener("keydown", (e) => {
+    if (e.key === "Escape" && !dom.settingsOverlay.classList.contains("hidden")) {
+      closeSettings();
+    }
+  });
+
+  dom.toggleKeyVisibility.addEventListener("click", () => {
+    const isPassword = dom.settingsApiKey.type === "password";
+    dom.settingsApiKey.type = isPassword ? "text" : "password";
+    dom.toggleKeyVisibility.textContent = isPassword ? "🙈" : "👁";
+    dom.toggleKeyVisibility.setAttribute("aria-label",
+      isPassword ? "Hide API key" : "Show API key");
+  });
+
+  dom.settingsSave.addEventListener("click", saveSettings);
+  dom.settingsClear.addEventListener("click", clearSettings);
+}
+
+/** Opens the settings overlay and sets aria-expanded on the trigger. */
+function openSettings() {
+  _refreshSettingsFields();
+  dom.settingsOverlay.classList.remove("hidden");
+  dom.settingsBtn.setAttribute("aria-expanded", "true");
+  dom.settingsApiUrl.focus();
+}
+
+/** Closes the settings overlay. */
+function closeSettings() {
+  dom.settingsOverlay.classList.add("hidden");
+  dom.settingsBtn.setAttribute("aria-expanded", "false");
+  dom.settingsStatus.classList.add("hidden");
+  dom.settingsStatus.className = "settings-status hidden";
+}
+
+/**
+ * Validates and persists settings to localStorage, then shows a status message.
+ */
+function saveSettings() {
+  const rawUrl = dom.settingsApiUrl.value.trim().replace(/\/$/, "");
+  const rawKey = dom.settingsApiKey.value.trim();
+
+  if (rawUrl && !rawUrl.startsWith("https://") && !rawUrl.startsWith("http://")) {
+    _showSettingsStatus("API URL must start with https:// or http://", "error");
+    return;
+  }
+
+  if (rawUrl) {
+    localStorage.setItem(LS_KEY_API_URL, rawUrl);
+  } else {
+    localStorage.removeItem(LS_KEY_API_URL);
+  }
+
+  if (rawKey) {
+    localStorage.setItem(LS_KEY_API_KEY, rawKey);
+  } else {
+    localStorage.removeItem(LS_KEY_API_KEY);
+  }
+
+  _updateSettingsIndicator();
+  _showSettingsStatus("Settings saved.", "success");
+  setTimeout(closeSettings, 900);
+}
+
+/**
+ * Clears both localStorage keys and resets the fields to their defaults.
+ */
+function clearSettings() {
+  localStorage.removeItem(LS_KEY_API_URL);
+  localStorage.removeItem(LS_KEY_API_KEY);
+  _refreshSettingsFields();
+  _updateSettingsIndicator();
+  _showSettingsStatus("Reset to defaults.", "success");
+}
+
+/** Fills the settings inputs from localStorage (or shows empty if not set). */
+function _refreshSettingsFields() {
+  dom.settingsApiUrl.value = localStorage.getItem(LS_KEY_API_URL) || "";
+  dom.settingsApiKey.value = localStorage.getItem(LS_KEY_API_KEY) || "";
+}
+
+/**
+ * Adds/removes the orange indicator dot on the gear button when custom
+ * settings are active.
+ */
+function _updateSettingsIndicator() {
+  const hasCustom =
+    !!localStorage.getItem(LS_KEY_API_URL) ||
+    !!localStorage.getItem(LS_KEY_API_KEY);
+  dom.settingsBtn.classList.toggle("has-custom", hasCustom);
+}
+
+/**
+ * Shows a status message inside the settings panel.
+ *
+ * @param {string} message
+ * @param {"success"|"error"} type
+ */
+function _showSettingsStatus(message, type) {
+  dom.settingsStatus.textContent = message;
+  dom.settingsStatus.className = `settings-status ${type}`;
 }
 
 /* ============================================================

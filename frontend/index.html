@@ -3,6 +3,10 @@
                managed by app.js: upload (with preferences form), loading,
                verify (ingredient confirmation), generating, and results.
                A "How to use" panel is always visible above the upload form.
+               A gear icon (⚙) in the header opens a settings panel where
+               the user can override the API Gateway URL and set an API key;
+               values are persisted to localStorage and take priority over
+               config.js at runtime.
                config.js is loaded first so window.API_BASE_URL is set before
                app.js runs. No client-side framework — vanilla HTML/JS.
   Last Modified By: bvela
@@ -11,6 +15,7 @@
       2026-07-01 - File created.
       2026-07-01 - Added preferences form, ingredient verification step,
                    how-to panel.
+      2026-07-01 - Added settings panel (gear icon) for API URL + API key.
 -->
 <!DOCTYPE html>
 <html lang="en">
@@ -25,9 +30,85 @@
   <body>
 
     <header class="site-header" role="banner">
-      <h1>🍳 Snap &amp; Cook</h1>
-      <p>Photograph your ingredients — get personalised recipes instantly</p>
+      <div class="header-inner">
+        <div class="header-brand">
+          <h1>🍳 Snap &amp; Cook</h1>
+          <p>Photograph your ingredients — get personalised recipes instantly</p>
+        </div>
+        <button
+          id="settings-btn"
+          class="settings-btn"
+          aria-label="Open API settings"
+          aria-expanded="false"
+          aria-controls="settings-panel"
+          title="API Settings"
+        >⚙</button>
+      </div>
     </header>
+
+    <!-- ======================================================
+         Settings panel (hidden until gear is clicked)
+         ====================================================== -->
+    <div
+      id="settings-overlay"
+      class="settings-overlay hidden"
+      role="dialog"
+      aria-modal="true"
+      aria-labelledby="settings-title"
+    >
+      <div class="settings-panel" id="settings-panel">
+        <div class="settings-header">
+          <h2 id="settings-title" class="settings-title">API Settings</h2>
+          <button id="settings-close" class="settings-close" aria-label="Close settings">×</button>
+        </div>
+
+        <p class="settings-description">
+          Override the default API Gateway endpoint or add an API key for
+          protected deployments. Values are saved in your browser and applied
+          to every request.
+        </p>
+
+        <div class="settings-field">
+          <label class="settings-label" for="settings-api-url">
+            API Gateway URL
+            <span class="settings-hint">e.g. https://abc123.execute-api.us-east-1.amazonaws.com</span>
+          </label>
+          <input
+            type="url"
+            id="settings-api-url"
+            class="settings-input"
+            placeholder="https://…"
+            autocomplete="off"
+            spellcheck="false"
+          />
+        </div>
+
+        <div class="settings-field">
+          <label class="settings-label" for="settings-api-key">
+            API Key
+            <span class="settings-hint">Required if API Gateway usage plan is enforced</span>
+          </label>
+          <div class="settings-password-row">
+            <input
+              type="password"
+              id="settings-api-key"
+              class="settings-input"
+              placeholder="Leave blank if not required"
+              autocomplete="off"
+              spellcheck="false"
+            />
+            <button type="button" id="toggle-key-visibility" class="btn-icon" aria-label="Toggle API key visibility">👁</button>
+          </div>
+        </div>
+
+        <div class="settings-footer">
+          <button type="button" id="settings-clear" class="btn btn-secondary">Reset to defaults</button>
+          <button type="button" id="settings-save" class="btn btn-primary">Save</button>
+        </div>
+
+        <div id="settings-status" class="settings-status hidden" aria-live="polite"></div>
+      </div>
+    </div>
 
     <main role="main">
 
