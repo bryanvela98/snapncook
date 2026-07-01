@@ -10,14 +10,18 @@ Last Modified By: bvela
 Created: 2026-06-30
 Last Modified:
     2026-06-30 - File created: initial implementation.
+    2026-07-01 - Parse multipart/form-data body to extract raw image bytes
+                 before storing in S3 (Rekognition rejects the MIME wrapper).
 """
 
 import base64
+import email.message
 import json
 import logging
 import os
 import time
 import uuid
+from email.parser import BytesParser
 from typing import Any
 
 import boto3
@@ -57,14 +61,26 @@ def handler(event: dict[str, Any], context: Any) -> dict[str, Any]:
     # API Gateway sets isBase64Encoded when binary media types are configured.
     is_b64 = event.get("isBase64Encoded", False)
     try:
-        image_bytes = base64.b64decode(body) if is_b64 else body.encode()
+        raw_body = base64.b64decode(body) if is_b64 else body.encode()
     except Exception:
         return _error(400, "Could not decode request body.")
 
-    if not image_bytes:
+    if not raw_body:
         return _error(400, "Image body is empty.")
 
     content_type = _extract_content_type(event)
+
+    # Browser uploads arrive as multipart/form-data. Extract only the image
+    # bytes from the "image" field — sending the full MIME envelope to
+    # Rekognition causes InvalidImageFormatException.
+    try:
+        if content_type.startswith("multipart/form-data"):
+            image_bytes, content_type = _parse_multipart_image(raw_body, content_type)
+        else:
+            image_bytes = raw_body
+    except ValueError as exc:
+        return _error(400, str(exc))
+
     filename = _extract_filename(event, content_type)
     request_id = str(uuid.uuid4())
     s3_key = f"uploads/{request_id}/{filename}"
@@ -134,6 +150,40 @@ def _publish_job(request_id: str, s3_key: str) -> None:
             "requestId": {"StringValue": request_id, "DataType": "String"}
         },
     )
+
+
+def _parse_multipart_image(body: bytes, content_type: str) -> tuple[bytes, str]:
+    """Extract the raw image bytes from a multipart/form-data body.
+
+    API Gateway forwards browser FormData uploads with the full MIME envelope
+    intact. This function locates the part whose Content-Disposition names the
+    field "image" and returns its decoded bytes and MIME type.
+
+    Args:
+        body: Raw (already base64-decoded) multipart body bytes.
+        content_type: Full Content-Type header value including the boundary
+                      parameter (e.g. "multipart/form-data; boundary=xyz").
+
+    Returns:
+        Tuple of (image_bytes, image_content_type).
+
+    Raises:
+        ValueError: If no part named "image" is found in the body.
+    """
+    # Prepend a synthetic Content-Type header so BytesParser can find the boundary.
+    prefixed = f"Content-Type: {content_type}\r\n\r\n".encode() + body
+    msg = BytesParser().parsebytes(prefixed)
+
+    for part in msg.get_payload():
+        if not isinstance(part, email.message.Message):
+            continue
+        disposition = part.get("Content-Disposition", "")
+        if 'name="image"' in disposition:
+            img_bytes = part.get_payload(decode=True)
+            img_content_type = part.get_content_type() or "image/jpeg"
+            return img_bytes, img_content_type
+
+    raise ValueError("No 'image' field found in multipart/form-data body.")
 
 
 def _extract_content_type(event: dict[str, Any]) -> str:
