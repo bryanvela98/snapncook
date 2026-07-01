@@ -12,9 +12,9 @@ variable "project_name" {
 }
 
 variable "visibility_timeout_seconds" {
-  description = "How long a message is hidden after a receive. Must exceed the processor Lambda's max runtime (cold start + Rekognition + Bedrock)."
+  description = "How long a message is hidden after a receive. Must exceed the processor Lambda timeout (120s) — SQS enforces this at event source mapping creation."
   type        = number
-  default     = 60
+  default     = 180
 }
 
 variable "max_receive_count" {
