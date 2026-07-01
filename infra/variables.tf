@@ -25,3 +25,9 @@ variable "bedrock_model_id" {
   type        = string
   default     = "amazon.nova-lite-v1:0"
 }
+
+variable "alarm_email" {
+  description = "Email address to subscribe to CloudWatch alarm notifications. Leave empty to skip subscription."
+  type        = string
+  default     = ""
+}

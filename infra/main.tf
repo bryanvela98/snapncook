@@ -1,15 +1,16 @@
 # =============================================================================
 # Description: Root module for the Snap & Cook stack. Wires together the
 #              storage, messaging, lambda, api, frontend, and monitoring
-#              modules. Currently empty (Task 0 scaffold) — modules are added
-#              phase by phase per tasks/plan.md. Provider + shared locals live
+#              modules. Modules are added phase by phase per tasks/plan.md.
+#              Provider + shared locals live
 #              here; backend config is in versions.tf.
 # Last Modified By: bvela
 # Created: 2026-06-30
 # Last Modified:
 #     2026-06-30 - File created: provider config + scaffold (no resources yet).
-#     2026-07-01 - Wired in frontend module (Task 9).
+#     2026-07-01 - Wired in frontend module.
 #     2026-07-01 - Wired confirm Lambda to api module (ingredient verification).
+#     2026-07-01 - Wired monitoring module.
 # =============================================================================
 
 provider "aws" {
@@ -77,5 +78,15 @@ module "frontend" {
   api_endpoint = module.api.api_endpoint
 }
 
-# Modules wired in as each phase lands (see tasks/plan.md):
-#   module "monitoring" { source = "./modules/monitoring" ... } # Task 11
+module "monitoring" {
+  source = "./modules/monitoring"
+
+  project_name            = var.project_name
+  ingest_function_name    = module.lambdas.ingest_function_name
+  processor_function_name = module.lambdas.processor_function_name
+  query_function_name     = module.lambdas.query_function_name
+  confirm_function_name   = module.lambdas.confirm_function_name
+  dlq_name                = module.messaging.dlq_name
+  # Set alarm_email via TF_VAR_alarm_email or -var to receive SNS notifications.
+  alarm_email = var.alarm_email
+}

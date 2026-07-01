@@ -27,3 +27,8 @@ output "dlq_arn" {
   description = "ARN of the dead-letter queue (for the DLQ-depth alarm)."
   value       = aws_sqs_queue.dlq.arn
 }
+
+output "dlq_name" {
+  description = "Name of the dead-letter queue (for the CloudWatch DLQ-depth alarm dimension)."
+  value       = aws_sqs_queue.dlq.name
+}
