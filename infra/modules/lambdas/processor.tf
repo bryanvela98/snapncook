@@ -9,6 +9,8 @@
 # Created: 2026-06-30
 # Last Modified:
 #     2026-06-30 - File created.
+#     2026-07-01 - Added DynamoDB GetItem for the generate phase (reads
+#                  confirmed ingredients + preferences before calling Bedrock).
 # =============================================================================
 
 data "archive_file" "processor" {
@@ -61,9 +63,11 @@ resource "aws_iam_role_policy" "processor" {
         Resource = "arn:aws:bedrock:${var.aws_region}::foundation-model/${var.bedrock_model_id}"
       },
       {
-        Sid      = "DynamoDBUpdate"
-        Effect   = "Allow"
-        Action   = ["dynamodb:UpdateItem"]
+        Sid    = "DynamoDBReadWrite"
+        Effect = "Allow"
+        # GetItem is needed in the generate phase to read confirmed ingredients
+        # and preferences written by the confirm Lambda.
+        Action   = ["dynamodb:GetItem", "dynamodb:UpdateItem"]
         Resource = var.results_table_arn
       },
       {

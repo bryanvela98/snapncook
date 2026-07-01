@@ -1,14 +1,15 @@
 /*
- * Description: Styles for the Snap & Cook frontend. Single-page app that guides
- *              a user through uploading a food photo, watching it process, and
- *              reading the resulting recipe cards. Three visible states: upload,
- *              loading, and results (plus an error state). Design uses a warm,
- *              food-forward palette — greens and oranges — with a neutral
- *              background. No external CSS frameworks or fonts are loaded.
+ * Description: Styles for the Snap & Cook frontend. Five app states: upload
+ *              (with preferences), loading, verify (ingredient confirmation),
+ *              generating, and results. How-to panel is always visible.
+ *              Warm food-themed palette — greens and oranges on a neutral
+ *              background. No external CSS frameworks or fonts.
  * Last Modified By: bvela
  * Created: 2026-07-01
  * Last Modified:
  *     2026-07-01 - File created.
+ *     2026-07-01 - Added preferences fieldset, verification section, how-to
+ *                  panel styles.
  */
 
 /* ============================================================
@@ -38,27 +39,18 @@
 
   --shadow-sm:  0 1px 2px rgba(0, 0, 0, 0.06);
   --shadow-md:  0 1px 3px rgba(0, 0, 0, 0.08), 0 1px 2px rgba(0, 0, 0, 0.04);
-  --shadow-lg:  0 4px 12px rgba(0, 0, 0, 0.08);
 
-  --font-sans:  -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto,
-                "Helvetica Neue", Arial, sans-serif;
-  --font-mono:  ui-monospace, "SFMono-Regular", Menlo, Consolas, monospace;
+  --font-sans: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto,
+               "Helvetica Neue", Arial, sans-serif;
 }
 
 /* ============================================================
    Reset & base
    ============================================================ */
 
-*, *::before, *::after {
-  box-sizing: border-box;
-  margin: 0;
-  padding: 0;
-}
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
 
-html {
-  font-size: 16px;
-  -webkit-text-size-adjust: 100%;
-}
+html { font-size: 16px; -webkit-text-size-adjust: 100%; }
 
 body {
   font-family: var(--font-sans);
@@ -99,30 +91,22 @@ main {
   display: flex;
   flex-direction: column;
   align-items: center;
-  padding: 2rem 1rem;
+  padding: 1.5rem 1rem 3rem;
   width: 100%;
-  max-width: 900px;
+  max-width: 860px;
   margin: 0 auto;
+  gap: 1.5rem;
 }
 
 /* ============================================================
    Utility
    ============================================================ */
 
-.hidden {
-  display: none !important;
-}
+.hidden { display: none !important; }
 
 .sr-only {
-  position: absolute;
-  width: 1px;
-  height: 1px;
-  padding: 0;
-  margin: -1px;
-  overflow: hidden;
-  clip: rect(0, 0, 0, 0);
-  white-space: nowrap;
-  border: 0;
+  position: absolute; width: 1px; height: 1px; padding: 0; margin: -1px;
+  overflow: hidden; clip: rect(0, 0, 0, 0); white-space: nowrap; border: 0;
 }
 
 /* ============================================================
@@ -141,43 +125,86 @@ main {
   cursor: pointer;
   border: none;
   transition: background 0.15s ease, transform 0.1s ease;
-  text-decoration: none;
 }
 
 .btn:active { transform: scale(0.98); }
 
-.btn-primary {
-  background: var(--color-primary);
-  color: #fff;
-}
-
-.btn-primary:hover:not(:disabled) {
-  background: var(--color-primary-hover);
-}
-
-.btn-primary:disabled {
-  opacity: 0.55;
-  cursor: not-allowed;
-}
+.btn-primary { background: var(--color-primary); color: #fff; }
+.btn-primary:hover:not(:disabled) { background: var(--color-primary-hover); }
+.btn-primary:disabled { opacity: 0.55; cursor: not-allowed; }
 
 .btn-secondary {
   background: var(--color-surface-muted);
   color: var(--color-text);
   border: 1px solid var(--color-border);
 }
-
-.btn-secondary:hover {
-  background: var(--color-border);
-}
+.btn-secondary:hover { background: var(--color-border); }
 
 .btn-ghost {
   background: transparent;
   color: var(--color-primary);
   border: 1px solid var(--color-primary-light);
 }
+.btn-ghost:hover { background: var(--color-primary-light); }
 
-.btn-ghost:hover {
-  background: var(--color-primary-light);
+.btn-full { width: 100%; justify-content: center; }
+
+/* ============================================================
+   How-to panel
+   ============================================================ */
+
+.how-to-panel {
+  width: 100%;
+  background: var(--color-surface);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-xl);
+  padding: 1.25rem 1.5rem;
+}
+
+.how-to-title {
+  font-size: 0.875rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: var(--color-text-muted);
+  margin-bottom: 1rem;
+}
+
+.how-to-steps {
+  list-style: none;
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 0.875rem;
+  counter-reset: step;
+}
+
+@media (max-width: 540px) {
+  .how-to-steps { grid-template-columns: 1fr; }
+}
+
+.how-to-step {
+  display: flex;
+  align-items: flex-start;
+  gap: 0.75rem;
+}
+
+.step-icon {
+  font-size: 1.25rem;
+  flex-shrink: 0;
+  margin-top: 0.125rem;
+}
+
+.how-to-step strong {
+  display: block;
+  font-size: 0.875rem;
+  font-weight: 600;
+  color: var(--color-text);
+}
+
+.how-to-step span {
+  font-size: 0.8125rem;
+  color: var(--color-text-muted);
+  line-height: 1.5;
 }
 
 /* ============================================================
@@ -186,26 +213,18 @@ main {
 
 .upload-section {
   width: 100%;
-  max-width: 560px;
   display: flex;
   flex-direction: column;
-  align-items: center;
-  gap: 1.5rem;
+  gap: 1rem;
 }
 
-.upload-section h2 {
-  font-size: 1.25rem;
-  font-weight: 600;
-  text-align: center;
-  color: var(--color-text);
-}
-
+/* Drop zone */
 .drop-zone {
   width: 100%;
   border: 2px dashed var(--color-border);
   border-radius: var(--radius-xl);
   background: var(--color-surface);
-  padding: 2.5rem 1.5rem;
+  padding: 2rem 1.5rem;
   text-align: center;
   cursor: pointer;
   transition: border-color 0.2s, background 0.2s;
@@ -223,26 +242,10 @@ main {
   border-style: solid;
 }
 
-.drop-zone-icon {
-  font-size: 2.5rem;
-  margin-bottom: 0.75rem;
-  display: block;
-}
-
-.drop-zone-text {
-  font-size: 0.9375rem;
-  color: var(--color-text-muted);
-}
-
-.drop-zone-text strong {
-  color: var(--color-primary);
-}
-
-.drop-zone-hint {
-  font-size: 0.8125rem;
-  color: var(--color-text-muted);
-  margin-top: 0.375rem;
-}
+.drop-zone-icon { font-size: 2rem; margin-bottom: 0.5rem; display: block; }
+.drop-zone-text { font-size: 0.9375rem; color: var(--color-text-muted); }
+.drop-zone-text strong { color: var(--color-primary); }
+.drop-zone-hint { font-size: 0.8125rem; color: var(--color-text-muted); margin-top: 0.25rem; }
 
 .file-input {
   position: absolute;
@@ -254,7 +257,7 @@ main {
 }
 
 .file-preview {
-  margin-top: 1rem;
+  margin-top: 0.875rem;
   display: flex;
   align-items: center;
   gap: 0.75rem;
@@ -264,8 +267,8 @@ main {
 }
 
 .file-preview img {
-  width: 48px;
-  height: 48px;
+  width: 44px;
+  height: 44px;
   object-fit: cover;
   border-radius: var(--radius-sm);
 }
@@ -277,30 +280,122 @@ main {
   text-overflow: ellipsis;
   white-space: nowrap;
   flex: 1;
+  text-align: left;
 }
 
-.upload-actions {
+/* Preferences fieldset */
+.preferences-fieldset {
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-lg);
+  padding: 1rem 1.25rem;
+  background: var(--color-surface);
+}
+
+.preferences-legend {
+  font-size: 0.875rem;
+  font-weight: 700;
+  color: var(--color-text-muted);
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  padding: 0 0.25rem;
+}
+
+.pref-row {
   display: flex;
-  gap: 0.75rem;
-  width: 100%;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+  padding: 0.625rem 0;
+  border-bottom: 1px solid var(--color-border);
 }
 
-.upload-actions .btn-primary {
-  flex: 1;
-  justify-content: center;
+.pref-row:last-child { border-bottom: none; padding-bottom: 0; }
+.pref-row:first-of-type { padding-top: 0.75rem; }
+
+.pref-row--checkboxes { align-items: flex-start; flex-wrap: wrap; }
+
+.pref-label {
+  font-size: 0.9rem;
+  font-weight: 500;
+  color: var(--color-text);
+  flex-shrink: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 0.125rem;
 }
+
+.pref-hint {
+  font-size: 0.75rem;
+  font-weight: 400;
+  color: var(--color-text-muted);
+}
+
+.pref-control {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+}
+
+.range-input {
+  width: 120px;
+  accent-color: var(--color-primary);
+  cursor: pointer;
+}
+
+.range-output {
+  font-size: 1rem;
+  font-weight: 700;
+  color: var(--color-primary);
+  min-width: 1.5rem;
+  text-align: center;
+}
+
+.pref-select {
+  font-family: var(--font-sans);
+  font-size: 0.875rem;
+  padding: 0.375rem 0.625rem;
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-sm);
+  background: var(--color-surface);
+  color: var(--color-text);
+  cursor: pointer;
+}
+
+.checkbox-group {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+}
+
+.checkbox-label {
+  display: flex;
+  align-items: center;
+  gap: 0.375rem;
+  font-size: 0.875rem;
+  cursor: pointer;
+  background: var(--color-surface-muted);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-sm);
+  padding: 0.3rem 0.625rem;
+  transition: background 0.15s, border-color 0.15s;
+}
+
+.checkbox-label:hover { background: var(--color-primary-light); border-color: var(--color-primary); }
+
+.checkbox-label input[type="checkbox"] { accent-color: var(--color-primary); }
 
 /* ============================================================
-   Loading section
+   Loading / generating sections
    ============================================================ */
 
 .loading-section {
   display: flex;
   flex-direction: column;
   align-items: center;
-  gap: 1.5rem;
+  gap: 1.25rem;
   padding: 3rem 1rem;
   text-align: center;
+  width: 100%;
 }
 
 .spinner {
@@ -312,25 +407,120 @@ main {
   animation: spin 0.75s linear infinite;
 }
 
-@keyframes spin {
-  to { transform: rotate(360deg); }
+@keyframes spin { to { transform: rotate(360deg); } }
+
+.loading-text { font-size: 1rem; color: var(--color-text-muted); }
+
+/* ============================================================
+   Verification section
+   ============================================================ */
+
+.verify-section {
+  width: 100%;
+  display: flex;
+  flex-direction: column;
+  gap: 1.25rem;
 }
 
-.loading-text {
-  font-size: 1rem;
+.verify-header h2 {
+  font-size: 1.125rem;
+  font-weight: 700;
+}
+
+.verify-subtext {
+  font-size: 0.875rem;
   color: var(--color-text-muted);
+  margin-top: 0.25rem;
 }
 
-.loading-status-dot {
-  display: inline-block;
-  animation: dots 1.4s steps(4, end) infinite;
+.verify-tags {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+  min-height: 2.5rem;
+  padding: 0.75rem;
+  background: var(--color-surface);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-lg);
 }
 
-@keyframes dots {
-  0%   { content: ""; }
-  25%  { content: "."; }
-  50%  { content: ".."; }
-  75%  { content: "..."; }
+.verify-tag {
+  display: flex;
+  align-items: center;
+  gap: 0.375rem;
+  background: var(--color-primary-light);
+  color: var(--color-primary);
+  border-radius: 999px;
+  padding: 0.25rem 0.5rem 0.25rem 0.75rem;
+  font-size: 0.875rem;
+  font-weight: 500;
+}
+
+.verify-tag-remove {
+  background: none;
+  border: none;
+  cursor: pointer;
+  color: var(--color-primary);
+  font-size: 1rem;
+  line-height: 1;
+  padding: 0;
+  display: flex;
+  align-items: center;
+  opacity: 0.6;
+  transition: opacity 0.15s;
+}
+
+.verify-tag-remove:hover { opacity: 1; }
+
+.verify-tags-empty {
+  font-size: 0.875rem;
+  color: var(--color-text-muted);
+  font-style: italic;
+  padding: 0.25rem;
+}
+
+.add-ingredient-row {
+  display: flex;
+  gap: 0.625rem;
+}
+
+.add-ingredient-input {
+  flex: 1;
+  font-family: var(--font-sans);
+  font-size: 0.9rem;
+  padding: 0.5rem 0.75rem;
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-md);
+  background: var(--color-surface);
+  color: var(--color-text);
+  transition: border-color 0.15s;
+}
+
+.add-ingredient-input:focus {
+  outline: none;
+  border-color: var(--color-primary);
+}
+
+/* Preferences summary shown in the verify step */
+.prefs-summary {
+  background: var(--color-surface-muted);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-md);
+  padding: 0.75rem 1rem;
+  font-size: 0.875rem;
+  color: var(--color-text-muted);
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+}
+
+.pref-badge {
+  background: var(--color-surface);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-sm);
+  padding: 0.2rem 0.5rem;
+  font-size: 0.8125rem;
+  color: var(--color-text);
 }
 
 /* ============================================================
@@ -351,20 +541,9 @@ main {
   gap: 1rem;
 }
 
-.error-icon {
-  font-size: 2rem;
-}
-
-.error-title {
-  font-size: 1rem;
-  font-weight: 600;
-  color: var(--color-error);
-}
-
-.error-message {
-  font-size: 0.875rem;
-  color: #7f1d1d;
-}
+.error-icon { font-size: 2rem; }
+.error-title { font-size: 1rem; font-weight: 600; color: var(--color-error); }
+.error-message { font-size: 0.875rem; color: #7f1d1d; }
 
 /* ============================================================
    Results section
@@ -385,10 +564,9 @@ main {
   gap: 0.75rem;
 }
 
-.results-header h2 {
-  font-size: 1.25rem;
-  font-weight: 700;
-}
+.results-header h2 { font-size: 1.25rem; font-weight: 700; }
+
+.results-actions { display: flex; gap: 0.5rem; }
 
 .ingredients-section {
   background: var(--color-surface);
@@ -406,11 +584,7 @@ main {
   margin-bottom: 0.625rem;
 }
 
-.ingredient-tags {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 0.375rem;
-}
+.ingredient-tags { display: flex; flex-wrap: wrap; gap: 0.375rem; }
 
 .ingredient-tag {
   background: var(--color-accent-light);
@@ -422,7 +596,7 @@ main {
 }
 
 /* ============================================================
-   Recipe grid
+   Recipe grid & cards
    ============================================================ */
 
 .recipe-grid {
@@ -431,15 +605,9 @@ main {
   gap: 1.25rem;
 }
 
-@media (min-width: 640px) {
-  .recipe-grid {
-    grid-template-columns: repeat(2, 1fr);
-  }
+@media (min-width: 600px) {
+  .recipe-grid { grid-template-columns: repeat(2, 1fr); }
 }
-
-/* ============================================================
-   Recipe card
-   ============================================================ */
 
 .recipe-card {
   background: var(--color-surface);
@@ -452,11 +620,7 @@ main {
   box-shadow: var(--shadow-md);
 }
 
-.recipe-card-header {
-  display: flex;
-  flex-direction: column;
-  gap: 0.5rem;
-}
+.recipe-card-header { display: flex; flex-direction: column; gap: 0.5rem; }
 
 .recipe-number {
   font-size: 0.75rem;
@@ -469,15 +633,10 @@ main {
 .recipe-name {
   font-size: 1.125rem;
   font-weight: 700;
-  color: var(--color-text);
   line-height: 1.3;
 }
 
-.recipe-time-badges {
-  display: flex;
-  gap: 0.5rem;
-  flex-wrap: wrap;
-}
+.recipe-time-badges { display: flex; gap: 0.5rem; flex-wrap: wrap; }
 
 .time-badge {
   display: flex;
@@ -491,10 +650,7 @@ main {
   color: var(--color-text-muted);
 }
 
-.recipe-divider {
-  border: none;
-  border-top: 1px solid var(--color-border);
-}
+.recipe-divider { border: none; border-top: 1px solid var(--color-border); }
 
 .recipe-section-title {
   font-size: 0.8125rem;
@@ -505,17 +661,10 @@ main {
   margin-bottom: 0.5rem;
 }
 
-/* Ingredients list */
-.recipe-ingredients {
-  list-style: none;
-  display: flex;
-  flex-direction: column;
-  gap: 0.25rem;
-}
+.recipe-ingredients { list-style: none; display: flex; flex-direction: column; gap: 0.25rem; }
 
 .recipe-ingredients li {
   font-size: 0.9rem;
-  color: var(--color-text);
   padding-left: 1rem;
   position: relative;
 }
@@ -527,7 +676,6 @@ main {
   color: var(--color-accent);
 }
 
-/* Instructions list */
 .recipe-instructions {
   list-style: none;
   display: flex;
@@ -538,7 +686,6 @@ main {
 
 .recipe-instructions li {
   font-size: 0.9rem;
-  color: var(--color-text);
   display: flex;
   gap: 0.75rem;
   counter-increment: step;
@@ -561,7 +708,7 @@ main {
 }
 
 /* ============================================================
-   Copy link toast
+   Toast
    ============================================================ */
 
 .toast {
@@ -588,16 +735,11 @@ main {
 }
 
 /* ============================================================
-   Responsive tweaks
+   Responsive
    ============================================================ */
 
-@media (max-width: 400px) {
-  .results-header {
-    flex-direction: column;
-    align-items: flex-start;
-  }
-
-  .upload-actions {
-    flex-direction: column;
-  }
+@media (max-width: 420px) {
+  .results-header { flex-direction: column; align-items: flex-start; }
+  .pref-row { flex-direction: column; align-items: flex-start; gap: 0.5rem; }
+  .range-input { width: 100%; }
 }

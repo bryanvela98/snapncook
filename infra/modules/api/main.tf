@@ -8,6 +8,7 @@
 # Created: 2026-06-30
 # Last Modified:
 #     2026-06-30 - File created: POST /analyze route + ingest Lambda integration.
+#     2026-07-01 - Added POST /recipes/{requestId}/confirm → confirm Lambda.
 # =============================================================================
 
 resource "aws_apigatewayv2_api" "api" {
@@ -85,6 +86,29 @@ resource "aws_lambda_permission" "apigw_query" {
   statement_id  = "AllowAPIGatewayInvoke"
   action        = "lambda:InvokeFunction"
   function_name = var.query_function_name
+  principal     = "apigateway.amazonaws.com"
+  source_arn    = "${aws_apigatewayv2_api.api.execution_arn}/*/*"
+}
+
+# --- POST /recipes/{requestId}/confirm → confirm Lambda ---
+
+resource "aws_apigatewayv2_integration" "confirm" {
+  api_id                 = aws_apigatewayv2_api.api.id
+  integration_type       = "AWS_PROXY"
+  integration_uri        = var.confirm_invoke_arn
+  payload_format_version = "2.0"
+}
+
+resource "aws_apigatewayv2_route" "post_confirm" {
+  api_id    = aws_apigatewayv2_api.api.id
+  route_key = "POST /recipes/{requestId}/confirm"
+  target    = "integrations/${aws_apigatewayv2_integration.confirm.id}"
+}
+
+resource "aws_lambda_permission" "apigw_confirm" {
+  statement_id  = "AllowAPIGatewayInvoke"
+  action        = "lambda:InvokeFunction"
+  function_name = var.confirm_function_name
   principal     = "apigateway.amazonaws.com"
   source_arn    = "${aws_apigatewayv2_api.api.execution_arn}/*/*"
 }

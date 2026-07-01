@@ -4,6 +4,7 @@
 # Created: 2026-06-30
 # Last Modified:
 #     2026-06-30 - File created.
+#     2026-07-01 - Added confirm Lambda variables.
 # =============================================================================
 
 variable "project_name" {
@@ -28,5 +29,15 @@ variable "query_invoke_arn" {
 
 variable "query_function_name" {
   description = "Name of the query Lambda function (for the resource-based permission)."
+  type        = string
+}
+
+variable "confirm_invoke_arn" {
+  description = "Invoke ARN of the confirm Lambda (for the API Gateway integration)."
+  type        = string
+}
+
+variable "confirm_function_name" {
+  description = "Name of the confirm Lambda function (for the resource-based permission)."
   type        = string
 }

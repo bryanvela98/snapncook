@@ -1,40 +1,81 @@
 <!--
-  Description: Single-page frontend for Snap & Cook. Three main states managed
-               by app.js: upload form, loading/polling, and recipe card grid.
-               config.js is loaded first so window.API_BASE_URL is always set
-               before app.js runs. No client-side framework — vanilla HTML/JS.
+  Description: Single-page frontend for Snap & Cook. Five visible states
+               managed by app.js: upload (with preferences form), loading,
+               verify (ingredient confirmation), generating, and results.
+               A "How to use" panel is always visible above the upload form.
+               config.js is loaded first so window.API_BASE_URL is set before
+               app.js runs. No client-side framework — vanilla HTML/JS.
   Last Modified By: bvela
   Created: 2026-07-01
   Last Modified:
       2026-07-01 - File created.
+      2026-07-01 - Added preferences form, ingredient verification step,
+                   how-to panel.
 -->
 <!DOCTYPE html>
 <html lang="en">
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <meta name="description" content="Upload a photo of your ingredients and get AI-generated recipe suggestions." />
+    <meta name="description" content="Upload a photo of your ingredients, verify what was detected, set your preferences, and get AI-generated recipes." />
     <title>Snap &amp; Cook — AI Recipe Generator</title>
     <link rel="stylesheet" href="styles.css" />
-    <!-- config.js must load before app.js so API_BASE_URL is available -->
     <script src="config.js"></script>
   </head>
   <body>
 
     <header class="site-header" role="banner">
       <h1>🍳 Snap &amp; Cook</h1>
-      <p>Photograph your ingredients — get two recipes instantly</p>
+      <p>Photograph your ingredients — get personalised recipes instantly</p>
     </header>
 
     <main role="main">
 
       <!-- ======================================================
+           How-to panel (always visible)
+           ====================================================== -->
+      <section class="how-to-panel" aria-label="How to use Snap & Cook">
+        <h2 class="how-to-title">How it works</h2>
+        <ol class="how-to-steps">
+          <li class="how-to-step">
+            <span class="step-icon" aria-hidden="true">📷</span>
+            <div>
+              <strong>Take a photo</strong>
+              <span>Snap a picture of your fridge, pantry, or any ingredients you have on hand.</span>
+            </div>
+          </li>
+          <li class="how-to-step">
+            <span class="step-icon" aria-hidden="true">✅</span>
+            <div>
+              <strong>Confirm ingredients</strong>
+              <span>Review what AI detected, remove anything incorrect, and add anything that was missed.</span>
+            </div>
+          </li>
+          <li class="how-to-step">
+            <span class="step-icon" aria-hidden="true">⚙️</span>
+            <div>
+              <strong>Set your preferences</strong>
+              <span>Choose how many recipes you want, your maximum prep time, and any dietary restrictions.</span>
+            </div>
+          </li>
+          <li class="how-to-step">
+            <span class="step-icon" aria-hidden="true">🍽️</span>
+            <div>
+              <strong>Get your recipes</strong>
+              <span>AI generates personalised recipes with full ingredient lists and step-by-step instructions.</span>
+            </div>
+          </li>
+        </ol>
+      </section>
+
+      <!-- ======================================================
            Upload section
            ====================================================== -->
       <section id="upload-section" class="upload-section" aria-label="Upload a food photo">
-        <h2>What's in your fridge?</h2>
 
         <form id="upload-form" novalidate>
+
+          <!-- Drop zone -->
           <div
             id="drop-zone"
             class="drop-zone"
@@ -45,7 +86,7 @@
             <p class="drop-zone-text">
               <strong>Drop a photo here</strong> or click to browse
             </p>
-            <p class="drop-zone-hint">Accepts JPEG, PNG, WEBP — up to 10 MB</p>
+            <p class="drop-zone-hint">JPEG, PNG, WEBP · max 10 MB</p>
 
             <input
               type="file"
@@ -55,29 +96,94 @@
               aria-label="Select an image file"
             />
 
-            <!-- Preview shown after file selection -->
             <div id="file-preview" class="file-preview hidden" aria-live="polite">
               <img id="preview-img" src="" alt="Selected image preview" />
               <span id="preview-name" class="file-preview-name"></span>
             </div>
           </div>
 
-          <div class="upload-actions" style="margin-top: 1rem;">
-            <button
-              type="submit"
-              id="submit-btn"
-              class="btn btn-primary"
-              disabled
-              aria-label="Analyze ingredients and generate recipes"
-            >
-              Analyze Ingredients
-            </button>
-          </div>
+          <!-- Preferences -->
+          <fieldset class="preferences-fieldset">
+            <legend class="preferences-legend">Recipe preferences</legend>
+
+            <!-- Recipe count -->
+            <div class="pref-row">
+              <label class="pref-label" for="recipe-count">
+                Number of recipes
+                <span class="pref-hint">1 – 5</span>
+              </label>
+              <div class="pref-control">
+                <input
+                  type="range"
+                  id="recipe-count"
+                  name="recipe_count"
+                  min="1"
+                  max="5"
+                  value="2"
+                  class="range-input"
+                  aria-valuemin="1"
+                  aria-valuemax="5"
+                  aria-valuenow="2"
+                />
+                <output id="recipe-count-value" class="range-output" for="recipe-count">2</output>
+              </div>
+            </div>
+
+            <!-- Max prep time -->
+            <div class="pref-row">
+              <label class="pref-label" for="max-prep-time">Max prep + cook time</label>
+              <select id="max-prep-time" name="max_prep_time" class="pref-select">
+                <option value="">No limit</option>
+                <option value="15">15 minutes</option>
+                <option value="30">30 minutes</option>
+                <option value="45">45 minutes</option>
+                <option value="60">1 hour</option>
+                <option value="90">1.5 hours</option>
+              </select>
+            </div>
+
+            <!-- Dietary restrictions -->
+            <div class="pref-row pref-row--checkboxes">
+              <span class="pref-label">Dietary restrictions</span>
+              <div class="checkbox-group" role="group" aria-label="Dietary restrictions">
+                <label class="checkbox-label">
+                  <input type="checkbox" name="dietary" value="vegetarian" />
+                  Vegetarian
+                </label>
+                <label class="checkbox-label">
+                  <input type="checkbox" name="dietary" value="vegan" />
+                  Vegan
+                </label>
+                <label class="checkbox-label">
+                  <input type="checkbox" name="dietary" value="gluten-free" />
+                  Gluten-Free
+                </label>
+                <label class="checkbox-label">
+                  <input type="checkbox" name="dietary" value="dairy-free" />
+                  Dairy-Free
+                </label>
+                <label class="checkbox-label">
+                  <input type="checkbox" name="dietary" value="low-carb" />
+                  Low-Carb
+                </label>
+              </div>
+            </div>
+          </fieldset>
+
+          <button
+            type="submit"
+            id="submit-btn"
+            class="btn btn-primary btn-full"
+            disabled
+            aria-label="Upload image and detect ingredients"
+          >
+            Detect Ingredients
+          </button>
         </form>
       </section>
 
       <!-- ======================================================
-           Loading section
+           Loading / analysing section
            ====================================================== -->
       <section
         id="loading-section"
@@ -91,6 +197,65 @@
       </section>
 
       <!-- ======================================================
+           Ingredient verification section
+           ====================================================== -->
+      <section
+        id="verify-section"
+        class="verify-section hidden"
+        aria-label="Verify detected ingredients"
+        aria-live="polite"
+      >
+        <div class="verify-header">
+          <h2>Confirm your ingredients</h2>
+          <p class="verify-subtext">
+            Review what we detected. Remove anything wrong and add anything missing.
+          </p>
+        </div>
+
+        <div id="verify-tags" class="verify-tags" aria-label="Detected ingredients — click × to remove" aria-live="polite"></div>
+
+        <!-- Add ingredient -->
+        <div class="add-ingredient-row">
+          <label for="add-ingredient-input" class="sr-only">Add an ingredient</label>
+          <input
+            type="text"
+            id="add-ingredient-input"
+            class="add-ingredient-input"
+            placeholder="Add an ingredient (e.g. olive oil)…"
+            autocomplete="off"
+            maxlength="60"
+          />
+          <button type="button" id="add-ingredient-btn" class="btn btn-secondary">Add</button>
+        </div>
+
+        <!-- Preferences summary (read-only) -->
+        <div id="prefs-summary" class="prefs-summary"></div>
+
+        <button
+          type="button"
+          id="generate-btn"
+          class="btn btn-primary btn-full"
+          aria-label="Generate recipes with the confirmed ingredients"
+        >
+          Generate Recipes
+        </button>
+      </section>
+
+      <!-- ======================================================
+           Generating section
+           ====================================================== -->
+      <section
+        id="generating-section"
+        class="loading-section hidden"
+        aria-label="Generating recipes"
+        aria-live="polite"
+        aria-busy="true"
+      >
+        <div class="spinner" role="status" aria-label="Generating"></div>
+        <p class="loading-text">Generating your recipes…</p>
+      </section>
+
+      <!-- ======================================================
            Results section
            ====================================================== -->
       <section
@@ -101,18 +266,21 @@
       >
         <div class="results-header">
           <h2>Your Recipes</h2>
-          <button id="copy-link-btn" class="btn btn-ghost" aria-label="Copy shareable link to these recipes">
-            🔗 Copy Shareable Link
-          </button>
+          <div class="results-actions">
+            <button id="copy-link-btn" class="btn btn-ghost" aria-label="Copy shareable link">
+              🔗 Share
+            </button>
+            <button id="new-recipe-btn" class="btn btn-secondary" aria-label="Start over with a new photo">
+              New Photo
+            </button>
+          </div>
         </div>
 
-        <!-- Detected ingredients -->
         <div id="ingredients-section" class="ingredients-section hidden">
-          <h3>Detected Ingredients</h3>
-          <div id="ingredient-tags" class="ingredient-tags" aria-label="Detected ingredients"></div>
+          <h3>Ingredients used</h3>
+          <div id="ingredient-tags" class="ingredient-tags" aria-label="Ingredients used"></div>
         </div>
 
-        <!-- Recipe cards -->
         <div id="recipe-grid" class="recipe-grid" aria-label="Recipe cards"></div>
       </section>
 
@@ -133,7 +301,6 @@
 
     </main>
 
-    <!-- Toast notification (clipboard feedback) -->
     <div id="toast" class="toast" role="status" aria-live="polite"></div>
 
     <script src="app.js"></script>

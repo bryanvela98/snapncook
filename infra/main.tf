@@ -9,6 +9,7 @@
 # Last Modified:
 #     2026-06-30 - File created: provider config + scaffold (no resources yet).
 #     2026-07-01 - Wired in frontend module (Task 9).
+#     2026-07-01 - Wired confirm Lambda to api module (ingredient verification).
 # =============================================================================
 
 provider "aws" {
@@ -59,11 +60,13 @@ module "lambdas" {
 module "api" {
   source = "./modules/api"
 
-  project_name         = var.project_name
-  ingest_invoke_arn    = module.lambdas.ingest_invoke_arn
-  ingest_function_name = module.lambdas.ingest_function_name
-  query_invoke_arn     = module.lambdas.query_invoke_arn
-  query_function_name  = module.lambdas.query_function_name
+  project_name          = var.project_name
+  ingest_invoke_arn     = module.lambdas.ingest_invoke_arn
+  ingest_function_name  = module.lambdas.ingest_function_name
+  query_invoke_arn      = module.lambdas.query_invoke_arn
+  query_function_name   = module.lambdas.query_function_name
+  confirm_invoke_arn    = module.lambdas.confirm_invoke_arn
+  confirm_function_name = module.lambdas.confirm_function_name
 }
 
 module "frontend" {

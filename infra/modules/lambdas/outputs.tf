@@ -5,6 +5,7 @@
 # Created: 2026-06-30
 # Last Modified:
 #     2026-06-30 - File created.
+#     2026-07-01 - Added confirm Lambda outputs.
 # =============================================================================
 
 output "ingest_function_name" {
@@ -30,4 +31,14 @@ output "query_function_name" {
 output "query_invoke_arn" {
   description = "Invoke ARN of the query Lambda (used by API Gateway integration)."
   value       = aws_lambda_function.query.invoke_arn
+}
+
+output "confirm_function_name" {
+  description = "Name of the confirm Lambda function."
+  value       = aws_lambda_function.confirm.function_name
+}
+
+output "confirm_invoke_arn" {
+  description = "Invoke ARN of the confirm Lambda (used by API Gateway integration)."
+  value       = aws_lambda_function.confirm.invoke_arn
 }

@@ -1,17 +1,28 @@
 """
 Description: Processor Lambda for Snap & Cook. Triggered by SQS event source
-             mapping. For each job message, fetches the uploaded image from S3,
-             calls Rekognition DetectLabels to identify ingredient candidates,
-             then calls Bedrock (Claude 3 Haiku) to generate 2 complete recipe
-             suggestions. Writes the final result (or a FAILED status on error)
-             to DynamoDB. Designed to be idempotent: re-processing the same
-             requestId overwrites the existing record rather than duplicating.
-             Secrets must come from environment variables, never hard-coded.
+             mapping. Handles two phases keyed by the 'phase' field in the
+             message body:
+
+               phase='detect'  (default): Fetches the uploaded image from S3,
+                 calls Rekognition DetectLabels, filters food-relevant labels,
+                 and writes AWAITING_CONFIRMATION + ingredients to DynamoDB.
+                 The frontend then shows an ingredient verification UI.
+
+               phase='generate': Reads confirmed ingredients and user
+                 preferences from DynamoDB, calls Bedrock to generate recipes
+                 (recipe_count, max_prep_time, dietary constraints applied),
+                 and writes COMPLETE to DynamoDB.
+
+             On any error the record is set to FAILED and the exception is
+             re-raised so SQS retries up to maxReceiveCount=3 before routing
+             to the DLQ. Secrets come from environment variables only.
 Last Modified By: bvela
 Created: 2026-06-30
 Last Modified:
     2026-06-30 - File created: SQS trigger, Rekognition detection, Bedrock
                  recipe generation, DynamoDB write.
+    2026-07-01 - Split into detect/generate phases to support ingredient
+                 verification step and user recipe preferences.
 """
 
 import json
@@ -32,23 +43,18 @@ _dynamodb = boto3.resource("dynamodb")
 
 IMAGE_BUCKET = os.environ["IMAGE_BUCKET"]
 RESULTS_TABLE = os.environ["RESULTS_TABLE"]
+BEDROCK_MODEL_ID = os.environ.get("BEDROCK_MODEL_ID", "amazon.nova-lite-v1:0")
 
-# Rekognition labels with confidence below this threshold are discarded.
 _MIN_CONFIDENCE = 70.0
-
-# Parent categories that indicate a label is food-related.
 _FOOD_PARENTS = {"Food", "Fruit", "Vegetable", "Dish", "Meal", "Produce", "Seafood", "Meat"}
 
-BEDROCK_MODEL_ID = os.environ.get(
-    "BEDROCK_MODEL_ID", "amazon.nova-lite-v1:0"
-)
 
+# =============================================================================
+# Entry point
+# =============================================================================
 
 def handler(event: dict[str, Any], context: Any) -> None:
-    """Lambda entry point — process one SQS batch and generate recipes.
-
-    SQS event source mapping delivers records in batches (batch size = 1 here).
-    Each record body contains { requestId, s3_key }.
+    """Lambda entry point — dispatch SQS records to the correct processing phase.
 
     Args:
         event: SQS event with a 'Records' list.
@@ -59,32 +65,48 @@ def handler(event: dict[str, Any], context: Any) -> None:
 
 
 def _process_record(record: dict[str, Any]) -> None:
-    """Process a single SQS message end-to-end.
+    """Route a single SQS message to detect or generate phase.
 
     Args:
         record: A single SQS event record.
     """
     body = json.loads(record["body"])
     request_id = body["requestId"]
-    s3_key = body["s3_key"]
+    phase = body.get("phase", "detect")
 
-    logger.info(json.dumps({"msg": "processing started", "requestId": request_id, "s3_key": s3_key}))
+    logger.info(json.dumps({"msg": "processing started", "requestId": request_id, "phase": phase}))
 
+    if phase == "detect":
+        _run_detection(request_id, body["s3_key"])
+    elif phase == "generate":
+        _run_generation(request_id)
+    else:
+        logger.warning(json.dumps({"msg": "unknown phase", "requestId": request_id, "phase": phase}))
+
+
+# =============================================================================
+# Phase 1 — Rekognition detection
+# =============================================================================
+
+def _run_detection(request_id: str, s3_key: str) -> None:
+    """Detect ingredients from the uploaded image and write AWAITING_CONFIRMATION.
+
+    Args:
+        request_id: UUID identifying this request.
+        s3_key: S3 object key of the uploaded image.
+    """
     try:
         ingredients = _detect_ingredients(s3_key, request_id)
-        recipes = _generate_recipes(ingredients, request_id)
-        _write_complete(request_id, ingredients, recipes)
+        _write_awaiting_confirmation(request_id, ingredients)
         logger.info(json.dumps({
-            "msg": "processing complete",
+            "msg": "detection complete",
             "requestId": request_id,
             "ingredient_count": len(ingredients),
-            "recipe_count": len(recipes),
+            "ingredients": ingredients,
         }))
     except Exception as exc:
-        logger.error(json.dumps({"msg": "processing failed", "requestId": request_id, "error": str(exc)}))
+        logger.error(json.dumps({"msg": "detection failed", "requestId": request_id, "error": str(exc)}))
         _write_failed(request_id, str(exc))
-        # Re-raise so SQS treats this as a failed receive and retries
-        # (up to maxReceiveCount=3, then routes to the DLQ).
         raise
 
 
@@ -106,27 +128,11 @@ def _detect_ingredients(s3_key: str, request_id: str) -> list[str]:
         MaxLabels=30,
         MinConfidence=_MIN_CONFIDENCE,
     )
-
-    labels = response.get("Labels", [])
-    ingredients = _filter_food_labels(labels)
-
-    logger.info(json.dumps({
-        "msg": "rekognition complete",
-        "requestId": request_id,
-        "total_labels": len(labels),
-        "food_labels": len(ingredients),
-        "ingredients": ingredients,
-    }))
-
-    return ingredients
+    return _filter_food_labels(response.get("Labels", []))
 
 
 def _filter_food_labels(labels: list[dict[str, Any]]) -> list[str]:
     """Keep only food-relevant labels by inspecting their parent categories.
-
-    A label is kept if it has at least one parent in _FOOD_PARENTS, or if
-    its own name is in _FOOD_PARENTS. This prevents furniture, people, and
-    kitchen objects from appearing in the ingredient list.
 
     Args:
         labels: Raw Labels list from Rekognition DetectLabels response.
@@ -136,39 +142,130 @@ def _filter_food_labels(labels: list[dict[str, Any]]) -> list[str]:
     """
     seen: set[str] = set()
     result: list[str] = []
-
     for label in labels:
         name = label.get("Name", "")
         parents = {p.get("Name", "") for p in label.get("Parents", [])}
-
-        is_food = name in _FOOD_PARENTS or bool(parents & _FOOD_PARENTS)
-        if is_food and name not in seen:
+        if (name in _FOOD_PARENTS or bool(parents & _FOOD_PARENTS)) and name not in seen:
             seen.add(name)
             result.append(name)
-
     return result
 
 
-def _generate_recipes(ingredients: list[str], request_id: str) -> list[dict[str, Any]]:
-    """Call Bedrock Claude 3 Haiku to generate 2 recipe suggestions.
+def _write_awaiting_confirmation(request_id: str, ingredients: list[str]) -> None:
+    """Write detected ingredients and set status to AWAITING_CONFIRMATION.
 
     Args:
-        ingredients: List of detected ingredient names.
+        request_id: UUID identifying the request.
+        ingredients: Detected ingredient names from Rekognition.
+    """
+    table = _dynamodb.Table(RESULTS_TABLE)
+    table.update_item(
+        Key={"requestId": request_id},
+        UpdateExpression="SET #s = :s, ingredients = :i, detected_at = :t",
+        ExpressionAttributeNames={"#s": "status"},
+        ExpressionAttributeValues={
+            ":s": "AWAITING_CONFIRMATION",
+            ":i": ingredients,
+            ":t": int(time.time()),
+        },
+    )
+
+
+# =============================================================================
+# Phase 2 — Bedrock recipe generation
+# =============================================================================
+
+def _run_generation(request_id: str) -> None:
+    """Generate recipes from confirmed ingredients + preferences, write COMPLETE.
+
+    Args:
+        request_id: UUID identifying this request.
+    """
+    try:
+        record = _read_record(request_id)
+        # The confirm Lambda writes confirmed_ingredients; fall back to the
+        # original Rekognition list if somehow missing.
+        ingredients = record.get("confirmed_ingredients") or record.get("ingredients", [])
+        preferences = record.get("preferences") or {}
+
+        recipes = _generate_recipes(ingredients, preferences, request_id)
+        _write_complete(request_id, ingredients, recipes)
+        logger.info(json.dumps({
+            "msg": "generation complete",
+            "requestId": request_id,
+            "recipe_count": len(recipes),
+        }))
+    except Exception as exc:
+        logger.error(json.dumps({"msg": "generation failed", "requestId": request_id, "error": str(exc)}))
+        _write_failed(request_id, str(exc))
+        raise
+
+
+def _read_record(request_id: str) -> dict[str, Any]:
+    """Fetch the DynamoDB record for a request.
+
+    Args:
+        request_id: UUID identifying the request.
+
+    Returns:
+        DynamoDB item dict.
+
+    Raises:
+        ValueError: If the record is not found.
+    """
+    table = _dynamodb.Table(RESULTS_TABLE)
+    result = table.get_item(Key={"requestId": request_id})
+    item = result.get("Item")
+    if item is None:
+        raise ValueError(f"Record not found for requestId={request_id}")
+    return item
+
+
+def _generate_recipes(
+    ingredients: list[str],
+    preferences: dict[str, Any],
+    request_id: str,
+) -> list[dict[str, Any]]:
+    """Call Bedrock to generate recipes respecting user preferences.
+
+    Args:
+        ingredients: Confirmed ingredient names.
+        preferences: Dict with optional keys recipe_count (int, 1–5),
+                     max_prep_time (str minutes), dietary (list[str]).
         request_id: UUID for structured logging.
 
     Returns:
-        List of recipe dicts, each with keys: name, ingredients,
-        instructions, prep_time, cook_time.
+        List of recipe dicts (name, ingredients, instructions, prep_time, cook_time).
 
     Raises:
-        ValueError: If Bedrock returns malformed JSON or fewer than 2 recipes.
+        ValueError: If Bedrock returns malformed JSON or fewer recipes than requested.
         Exception: Propagated from Bedrock on API errors.
     """
+    recipe_count = max(1, min(5, int(preferences.get("recipe_count", 2))))
+    max_prep_time = preferences.get("max_prep_time")
+    dietary = preferences.get("dietary") or []
+
     ingredient_list = ", ".join(ingredients) if ingredients else "assorted ingredients"
 
-    prompt = f"""You are a professional chef. Given these detected ingredients: {ingredient_list}
+    constraints: list[str] = []
+    if max_prep_time:
+        constraints.append(
+            f"Total preparation + cooking time must be {max_prep_time} minutes or less"
+        )
+    if dietary:
+        constraints.append(f"Dietary requirements: {', '.join(dietary)}")
+    constraints_block = (
+        "\n".join(f"- {c}" for c in constraints) if constraints else "- None"
+    )
 
-Return a JSON object with EXACTLY this structure and nothing else — no markdown, no explanation:
+    prompt = f"""You are a professional chef. Given these ingredients: {ingredient_list}
+
+Generate exactly {recipe_count} recipe(s).
+
+Constraints:
+{constraints_block}
+
+Return ONLY the following JSON object with no markdown fences, no explanation:
 {{
   "recipes": [
     {{
@@ -181,7 +278,11 @@ Return a JSON object with EXACTLY this structure and nothing else — no markdow
   ]
 }}
 
-Provide EXACTLY 2 recipe options. Add common pantry staples (salt, pepper, oil, garlic, etc.) as needed. Each recipe must have at least 4 cooking instruction steps."""
+Rules:
+- Provide EXACTLY {recipe_count} recipe(s) in the "recipes" array.
+- Each recipe must have at least 4 cooking instruction steps.
+- Add common pantry staples (salt, pepper, oil, garlic, etc.) as needed.
+- Respect all constraints above strictly."""
 
     body = json.dumps({
         "messages": [{"role": "user", "content": [{"text": prompt}]}],
@@ -198,7 +299,6 @@ Provide EXACTLY 2 recipe options. Add common pantry staples (salt, pepper, oil, 
     raw = json.loads(response["body"].read())
     text = raw["output"]["message"]["content"][0]["text"].strip()
 
-    # Strip markdown code fences if the model added them despite instructions.
     if text.startswith("```"):
         text = text.split("```")[1]
         if text.startswith("json"):
@@ -208,8 +308,10 @@ Provide EXACTLY 2 recipe options. Add common pantry staples (salt, pepper, oil, 
     parsed = json.loads(text)
     recipes = parsed.get("recipes", [])
 
-    if len(recipes) < 2:
-        raise ValueError(f"Bedrock returned {len(recipes)} recipe(s); expected 2.")
+    if len(recipes) < recipe_count:
+        raise ValueError(
+            f"Bedrock returned {len(recipes)} recipe(s); expected {recipe_count}."
+        )
 
     logger.info(json.dumps({
         "msg": "bedrock complete",
@@ -221,16 +323,20 @@ Provide EXACTLY 2 recipe options. Add common pantry staples (salt, pepper, oil, 
     return recipes
 
 
+# =============================================================================
+# Shared DynamoDB helpers
+# =============================================================================
+
 def _write_complete(
     request_id: str,
     ingredients: list[str],
     recipes: list[dict[str, Any]],
 ) -> None:
-    """Update the DynamoDB record to COMPLETE with ingredients and recipes.
+    """Update the DynamoDB record to COMPLETE.
 
     Args:
         request_id: UUID identifying the request.
-        ingredients: Detected ingredient names from Rekognition.
+        ingredients: Confirmed ingredient names.
         recipes: Generated recipe objects from Bedrock.
     """
     table = _dynamodb.Table(RESULTS_TABLE)
@@ -250,7 +356,7 @@ def _write_complete(
 
 
 def _write_failed(request_id: str, error_message: str) -> None:
-    """Update the DynamoDB record to FAILED with an error message.
+    """Update the DynamoDB record to FAILED.
 
     Args:
         request_id: UUID identifying the request.

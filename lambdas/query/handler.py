@@ -1,16 +1,22 @@
 """
 Description: Query Lambda for Snap & Cook. Entry point for the GET
              /recipes/{requestId} API route. Fetches the result record from
-             DynamoDB and returns the current status. Returns 200 + full recipe
-             data when COMPLETE, 200 + { status: PROCESSING } when still in
-             flight, 200 + { status: FAILED, error } on failure, and 404 when
-             the requestId is not found. The frontend polls this endpoint every
-             2 seconds until status is COMPLETE or FAILED.
+             DynamoDB and returns the current status. Statuses:
+               PROCESSING            — image uploaded, Rekognition not yet done
+               AWAITING_CONFIRMATION — ingredients detected, awaiting user review
+               GENERATING            — user confirmed; Bedrock running
+               COMPLETE              — recipes ready
+               FAILED                — unrecoverable error
+             Returns 200 + ingredients when AWAITING_CONFIRMATION so the
+             frontend can render the verification UI without a second request.
+             Returns 404 when the requestId is not found.
              Secrets must come from environment variables, never hard-coded.
 Last Modified By: bvela
 Created: 2026-07-01
 Last Modified:
     2026-07-01 - File created: initial implementation.
+    2026-07-01 - Expose ingredients on AWAITING_CONFIRMATION for the
+                 ingredient verification UI.
 """
 
 import json
@@ -64,6 +70,14 @@ def handler(event: dict[str, Any], context: Any) -> dict[str, Any]:
             "ingredients": item.get("ingredients", []),
             "recipes": item.get("recipes", []),
         }
+    elif status == "AWAITING_CONFIRMATION":
+        # Return detected ingredients so the frontend can render the
+        # verification UI in a single poll rather than a separate request.
+        body = {
+            "requestId": request_id,
+            "status": "AWAITING_CONFIRMATION",
+            "ingredients": item.get("ingredients", []),
+        }
     elif status == "FAILED":
         body = {
             "requestId": request_id,
@@ -71,6 +85,7 @@ def handler(event: dict[str, Any], context: Any) -> dict[str, Any]:
             "error": item.get("error_message", "Processing failed."),
         }
     else:
+        # Covers PROCESSING, GENERATING, and any future intermediate states.
         body = {"requestId": request_id, "status": status}
 
     logger.info(json.dumps({"msg": "query complete", "requestId": request_id, "status": status}))
