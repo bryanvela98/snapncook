@@ -7,13 +7,11 @@ Last Modified By: bvela
 Created: 2026-06-30
 Last Modified:
     2026-06-30 - File created: initial test suite for Rekognition path.
+    2026-07-01 - Removed unused `json`, `boto3`, `pytest` imports.
 """
 
-import json
 import os
 
-import boto3
-import pytest
 from botocore.stub import Stubber
 
 os.environ.setdefault("IMAGE_BUCKET", "test-image-bucket")

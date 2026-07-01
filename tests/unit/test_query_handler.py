@@ -6,11 +6,11 @@ Last Modified By: bvela
 Created: 2026-07-01
 Last Modified:
     2026-07-01 - File created: initial test suite.
+    2026-07-01 - Removed unused `time` import.
 """
 
 import json
 import os
-import time
 
 import boto3
 import pytest

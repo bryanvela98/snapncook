@@ -17,6 +17,7 @@ Last Modified:
     2026-07-01 - File created: initial implementation.
     2026-07-01 - Expose ingredients on AWAITING_CONFIRMATION for the
                  ingredient verification UI.
+    2026-07-01 - Removed unused TypeDeserializer import.
 """
 
 import json
@@ -25,7 +26,6 @@ import os
 from typing import Any
 
 import boto3
-from boto3.dynamodb.types import TypeDeserializer
 
 logger = logging.getLogger()
 logger.setLevel(logging.INFO)

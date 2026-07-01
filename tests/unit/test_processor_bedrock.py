@@ -7,12 +7,12 @@ Last Modified By: bvela
 Created: 2026-06-30
 Last Modified:
     2026-06-30 - File created: initial test suite for Bedrock + DynamoDB path.
+    2026-07-01 - Removed unused `time` import.
 """
 
 import io
 import json
 import os
-import time
 
 import boto3
 import pytest
