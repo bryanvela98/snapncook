@@ -21,3 +21,13 @@ output "processor_function_name" {
   description = "Name of the processor Lambda function."
   value       = aws_lambda_function.processor.function_name
 }
+
+output "query_function_name" {
+  description = "Name of the query Lambda function."
+  value       = aws_lambda_function.query.function_name
+}
+
+output "query_invoke_arn" {
+  description = "Invoke ARN of the query Lambda (used by API Gateway integration)."
+  value       = aws_lambda_function.query.invoke_arn
+}

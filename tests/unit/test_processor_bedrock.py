@@ -53,8 +53,10 @@ _TWO_RECIPES = {
 
 
 def _bedrock_response(payload: dict) -> dict:
-    """Build a stubbed Bedrock InvokeModel response."""
-    body_text = json.dumps({"content": [{"text": json.dumps(payload)}]})
+    """Build a stubbed Bedrock InvokeModel response in Amazon Nova format."""
+    body_text = json.dumps({
+        "output": {"message": {"content": [{"text": json.dumps(payload)}]}}
+    })
     return {
         "body": io.BytesIO(body_text.encode()),
         "contentType": "application/json",
@@ -104,7 +106,9 @@ class TestGenerateRecipes:
     def test_strips_markdown_code_fence(self):
         """Handles model output wrapped in ```json ... ``` fences."""
         fenced = f"```json\n{json.dumps(_TWO_RECIPES)}\n```"
-        body_text = json.dumps({"content": [{"text": fenced}]})
+        body_text = json.dumps({
+            "output": {"message": {"content": [{"text": fenced}]}}
+        })
 
         import lambdas.processor.handler as proc_module
         stubber = Stubber(proc_module._bedrock)

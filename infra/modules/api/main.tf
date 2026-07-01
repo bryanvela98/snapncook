@@ -66,6 +66,29 @@ resource "aws_lambda_permission" "apigw_ingest" {
   source_arn    = "${aws_apigatewayv2_api.api.execution_arn}/*/*"
 }
 
+# --- GET /recipes/{requestId} → query Lambda ---
+
+resource "aws_apigatewayv2_integration" "query" {
+  api_id                 = aws_apigatewayv2_api.api.id
+  integration_type       = "AWS_PROXY"
+  integration_uri        = var.query_invoke_arn
+  payload_format_version = "2.0"
+}
+
+resource "aws_apigatewayv2_route" "get_recipes" {
+  api_id    = aws_apigatewayv2_api.api.id
+  route_key = "GET /recipes/{requestId}"
+  target    = "integrations/${aws_apigatewayv2_integration.query.id}"
+}
+
+resource "aws_lambda_permission" "apigw_query" {
+  statement_id  = "AllowAPIGatewayInvoke"
+  action        = "lambda:InvokeFunction"
+  function_name = var.query_function_name
+  principal     = "apigateway.amazonaws.com"
+  source_arn    = "${aws_apigatewayv2_api.api.execution_arn}/*/*"
+}
+
 # --- CloudWatch log group for API access logs ---
 
 resource "aws_cloudwatch_log_group" "api" {

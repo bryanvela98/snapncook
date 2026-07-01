@@ -20,3 +20,13 @@ variable "ingest_function_name" {
   description = "Name of the ingest Lambda function (for the resource-based permission)."
   type        = string
 }
+
+variable "query_invoke_arn" {
+  description = "Invoke ARN of the query Lambda (from the lambdas module)."
+  type        = string
+}
+
+variable "query_function_name" {
+  description = "Name of the query Lambda function (for the resource-based permission)."
+  type        = string
+}

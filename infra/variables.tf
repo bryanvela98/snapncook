@@ -23,5 +23,5 @@ variable "project_name" {
 variable "bedrock_model_id" {
   description = "Bedrock model ID used for recipe generation."
   type        = string
-  default     = "us.anthropic.claude-haiku-4-5-20251001-v1:0"
+  default     = "amazon.nova-lite-v1:0"
 }

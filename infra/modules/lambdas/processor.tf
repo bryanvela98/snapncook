@@ -57,12 +57,8 @@ resource "aws_iam_role_policy" "processor" {
         Sid    = "BedrockInvoke"
         Effect = "Allow"
         Action = ["bedrock:InvokeModel"]
-        # Inference profiles use a different ARN pattern than foundation models.
-        # The us.* profile ID resolves to cross-region inference across US regions.
-        Resource = [
-          "arn:aws:bedrock:${var.aws_region}:${var.account_id}:inference-profile/${var.bedrock_model_id}",
-          "arn:aws:bedrock:*::foundation-model/anthropic.claude-haiku-4-5-20251001-v1:0",
-        ]
+        # Nova models use direct foundation-model ARNs (no inference profile needed).
+        Resource = "arn:aws:bedrock:${var.aws_region}::foundation-model/${var.bedrock_model_id}"
       },
       {
         Sid      = "DynamoDBUpdate"

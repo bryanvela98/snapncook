@@ -40,7 +40,7 @@ _MIN_CONFIDENCE = 70.0
 _FOOD_PARENTS = {"Food", "Fruit", "Vegetable", "Dish", "Meal", "Produce", "Seafood", "Meat"}
 
 BEDROCK_MODEL_ID = os.environ.get(
-    "BEDROCK_MODEL_ID", "us.anthropic.claude-haiku-4-5-20251001-v1:0"
+    "BEDROCK_MODEL_ID", "amazon.nova-lite-v1:0"
 )
 
 
@@ -184,9 +184,8 @@ Return a JSON object with EXACTLY this structure and nothing else — no markdow
 Provide EXACTLY 2 recipe options. Add common pantry staples (salt, pepper, oil, garlic, etc.) as needed. Each recipe must have at least 4 cooking instruction steps."""
 
     body = json.dumps({
-        "anthropic_version": "bedrock-2023-05-31",  # required field for all Claude on Bedrock
-        "max_tokens": 2048,
-        "messages": [{"role": "user", "content": prompt}],
+        "messages": [{"role": "user", "content": [{"text": prompt}]}],
+        "inferenceConfig": {"max_new_tokens": 2048, "temperature": 0.3},
     })
 
     response = _bedrock.invoke_model(
@@ -197,7 +196,7 @@ Provide EXACTLY 2 recipe options. Add common pantry staples (salt, pepper, oil, 
     )
 
     raw = json.loads(response["body"].read())
-    text = raw["content"][0]["text"].strip()
+    text = raw["output"]["message"]["content"][0]["text"].strip()
 
     # Strip markdown code fences if the model added them despite instructions.
     if text.startswith("```"):

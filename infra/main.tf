@@ -61,6 +61,8 @@ module "api" {
   project_name         = var.project_name
   ingest_invoke_arn    = module.lambdas.ingest_invoke_arn
   ingest_function_name = module.lambdas.ingest_function_name
+  query_invoke_arn     = module.lambdas.query_invoke_arn
+  query_function_name  = module.lambdas.query_function_name
 }
 
 # Modules wired in as each phase lands (see tasks/plan.md):
