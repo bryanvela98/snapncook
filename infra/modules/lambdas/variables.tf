@@ -60,3 +60,26 @@ variable "ingest_memory_mb" {
   type        = number
   default     = 256
 }
+
+variable "processor_memory_mb" {
+  description = "Memory (MB) for the processor Lambda. Higher — handles image + ML calls."
+  type        = number
+  default     = 512
+}
+
+variable "bedrock_model_id" {
+  description = "Bedrock model ID for recipe generation (used in IAM policy ARN and Lambda env var)."
+  type        = string
+  default     = "us.anthropic.claude-haiku-4-5-20251001-v1:0"
+}
+
+variable "aws_region" {
+  description = "AWS region (used to construct the Bedrock inference profile ARN in the IAM policy)."
+  type        = string
+  default     = "us-east-1"
+}
+
+variable "account_id" {
+  description = "AWS account ID (used to construct the Bedrock inference profile ARN)."
+  type        = string
+}

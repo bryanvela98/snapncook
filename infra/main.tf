@@ -50,6 +50,9 @@ module "lambdas" {
   results_table_arn  = module.storage.results_table_arn
   job_queue_url      = module.messaging.queue_url
   job_queue_arn      = module.messaging.queue_arn
+  bedrock_model_id   = var.bedrock_model_id
+  aws_region         = var.aws_region
+  account_id         = data.aws_caller_identity.current.account_id
 }
 
 module "api" {

@@ -16,3 +16,8 @@ output "ingest_invoke_arn" {
   description = "Invoke ARN of the ingest Lambda (used by API Gateway integration)."
   value       = aws_lambda_function.ingest.invoke_arn
 }
+
+output "processor_function_name" {
+  description = "Name of the processor Lambda function."
+  value       = aws_lambda_function.processor.function_name
+}
