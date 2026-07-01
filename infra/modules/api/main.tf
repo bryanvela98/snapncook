@@ -9,6 +9,7 @@
 # Last Modified:
 #     2026-06-30 - File created: POST /analyze route + ingest Lambda integration.
 #     2026-07-01 - Added POST /recipes/{requestId}/confirm → confirm Lambda.
+#     2026-07-01 - Added API Gateway stage throttling (security hardening).
 # =============================================================================
 
 resource "aws_apigatewayv2_api" "api" {
@@ -29,6 +30,13 @@ resource "aws_apigatewayv2_stage" "default" {
   api_id      = aws_apigatewayv2_api.api.id
   name        = "$default"
   auto_deploy = true
+
+  # Throttle all routes: 100 req/s sustained, burst up to 200.
+  # Protects downstream Lambdas and Bedrock from runaway client loops.
+  default_route_settings {
+    throttling_rate_limit  = var.api_throttle_rate
+    throttling_burst_limit = var.api_throttle_burst
+  }
 
   access_log_settings {
     destination_arn = aws_cloudwatch_log_group.api.arn

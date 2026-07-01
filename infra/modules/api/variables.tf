@@ -41,3 +41,15 @@ variable "confirm_function_name" {
   description = "Name of the confirm Lambda function (for the resource-based permission)."
   type        = string
 }
+
+variable "api_throttle_rate" {
+  description = "Sustained request rate limit (req/s) applied to all API routes."
+  type        = number
+  default     = 100
+}
+
+variable "api_throttle_burst" {
+  description = "Maximum burst request limit applied to all API routes."
+  type        = number
+  default     = 200
+}
