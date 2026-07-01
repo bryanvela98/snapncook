@@ -11,6 +11,7 @@
  *     2026-07-01 - Added preferences fieldset, verification section, how-to
  *                  panel styles.
  *     2026-07-01 - Added settings panel (gear icon, overlay, fields).
+ *     2026-07-01 - Added .settings-required for required-field asterisk markers.
  */
 
 /* ============================================================
@@ -223,6 +224,11 @@ body {
   font-size: 0.75rem;
   font-weight: 400;
   color: var(--color-text-muted);
+}
+
+.settings-required {
+  color: #c0392b;
+  font-weight: 700;
 }
 
 .settings-input {

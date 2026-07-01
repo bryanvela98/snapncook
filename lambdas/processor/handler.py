@@ -23,6 +23,9 @@ Last Modified:
                  recipe generation, DynamoDB write.
     2026-07-01 - Split into detect/generate phases to support ingredient
                  verification step and user recipe preferences.
+    2026-07-01 - Tightened Bedrock prompt: strict ingredients-only constraint
+                 with explicit condiment allowlist; model must not invent
+                 ingredients the user doesn't have.
 """
 
 import json
@@ -258,11 +261,11 @@ def _generate_recipes(
         "\n".join(f"- {c}" for c in constraints) if constraints else "- None"
     )
 
-    prompt = f"""You are a professional chef. Given these ingredients: {ingredient_list}
+    prompt = f"""You are a professional chef. The user has these ingredients available: {ingredient_list}
 
 Generate exactly {recipe_count} recipe(s).
 
-Constraints:
+Additional constraints:
 {constraints_block}
 
 Return ONLY the following JSON object with no markdown fences, no explanation:
@@ -278,11 +281,17 @@ Return ONLY the following JSON object with no markdown fences, no explanation:
   ]
 }}
 
-Rules:
+STRICT INGREDIENT RULES — follow these exactly:
+- Use ONLY the ingredients listed above plus these basic cooking condiments: \
+salt, black pepper, cooking oil (olive oil or vegetable oil), water, butter, \
+flour, sugar, white vinegar, soy sauce, garlic powder, onion powder, dried herbs \
+(oregano, thyme, basil, cumin, paprika).
+- Do NOT introduce ANY other ingredient that is not in the user's list or the \
+condiment list above. If a recipe would normally call for an ingredient the user \
+does not have, choose a different recipe that works with what they DO have.
+- Each recipe must use at least 4 cooking instruction steps.
 - Provide EXACTLY {recipe_count} recipe(s) in the "recipes" array.
-- Each recipe must have at least 4 cooking instruction steps.
-- Add common pantry staples (salt, pepper, oil, garlic, etc.) as needed.
-- Respect all constraints above strictly."""
+- Respect all additional constraints above strictly."""
 
     body = json.dumps({
         "messages": [{"role": "user", "content": [{"text": prompt}]}],

@@ -16,6 +16,13 @@
  *                  POST /confirm flow.
  *     2026-07-01 - Added settings panel (gear icon): API URL + key persisted
  *                  to localStorage, override config.js at runtime.
+ *     2026-07-01 - Added requireApiConfigured() guard (blocks upload/share-link
+ *                  load when no URL is set, opens settings panel with error).
+ *                  Fixed share button clipboard fallback for HTTP contexts.
+ *                  Added _fallbackCopy() with textarea + window.prompt last resort.
+ *     2026-07-01 - requireApiConfigured() now checks localStorage only (ignores
+ *                  config.js defaults): API URL must be explicitly saved in
+ *                  settings panel before the app can run. API key removed.
  */
 
 /* ============================================================
@@ -26,7 +33,6 @@ const POLL_INTERVAL_MS   = 2000;
 const POLL_TIMEOUT_MS    = 60000;
 
 const LS_KEY_API_URL = "snapcook_api_url";
-const LS_KEY_API_KEY = "snapcook_api_key";
 
 /* ============================================================
    Settings helpers — localStorage overrides config.js
@@ -43,33 +49,36 @@ function getApiUrl() {
 }
 
 /**
- * Returns the stored API key, or an empty string if not set.
+ * Checks that the API URL has been explicitly saved in localStorage via the
+ * settings panel. config.js defaults are intentionally ignored — the URL must
+ * be entered manually before the app can be used.
  *
- * @returns {string}
+ * @returns {boolean} true if a valid URL is saved, false otherwise.
  */
-function getApiKey() {
-  return localStorage.getItem(LS_KEY_API_KEY) || "";
+function requireApiConfigured() {
+  const savedUrl = localStorage.getItem(LS_KEY_API_URL) || "";
+
+  if (!savedUrl || !savedUrl.startsWith("http")) {
+    openSettings();
+    _showSettingsStatus(
+      "Enter your API Gateway URL above to continue.",
+      "error"
+    );
+    return false;
+  }
+
+  return true;
 }
 
 /**
- * Thin wrapper around fetch() that injects the API URL prefix and, if set,
- * the x-api-key header on every request.
+ * Thin wrapper around fetch() that prepends the API base URL to every request.
  *
  * @param {string} path - Path relative to the API base URL (e.g. "/analyze").
  * @param {RequestInit} [options] - Standard fetch options.
  * @returns {Promise<Response>}
  */
 function apiFetch(path, options = {}) {
-  const url = `${getApiUrl()}${path}`;
-  const key = getApiKey();
-
-  if (key) {
-    const headers = new Headers(options.headers || {});
-    headers.set("x-api-key", key);
-    options = { ...options, headers };
-  }
-
-  return fetch(url, options);
+  return fetch(`${getApiUrl()}${path}`, options);
 }
 
 /* ============================================================
@@ -141,15 +150,13 @@ function init() {
     retryBtn:          document.getElementById("retry-btn"),
     toast:             document.getElementById("toast"),
     // Settings panel
-    settingsBtn:         document.getElementById("settings-btn"),
-    settingsOverlay:     document.getElementById("settings-overlay"),
-    settingsClose:       document.getElementById("settings-close"),
-    settingsApiUrl:      document.getElementById("settings-api-url"),
-    settingsApiKey:      document.getElementById("settings-api-key"),
-    toggleKeyVisibility: document.getElementById("toggle-key-visibility"),
-    settingsSave:        document.getElementById("settings-save"),
-    settingsClear:       document.getElementById("settings-clear"),
-    settingsStatus:      document.getElementById("settings-status"),
+    settingsBtn:     document.getElementById("settings-btn"),
+    settingsOverlay: document.getElementById("settings-overlay"),
+    settingsClose:   document.getElementById("settings-close"),
+    settingsApiUrl:  document.getElementById("settings-api-url"),
+    settingsSave:    document.getElementById("settings-save"),
+    settingsClear:   document.getElementById("settings-clear"),
+    settingsStatus:  document.getElementById("settings-status"),
   };
 
   initSettings();
@@ -176,6 +183,7 @@ function init() {
   const params = new URLSearchParams(window.location.search);
   const preloadId = params.get("id");
   if (preloadId) {
+    if (!requireApiConfigured()) return;
     currentRequestId = preloadId;
     showSection("generating");
     pollingTarget = "COMPLETE";
@@ -269,6 +277,8 @@ async function handleUpload(event) {
     showError("Please select an image file before submitting.");
     return;
   }
+
+  if (!requireApiConfigured()) return;
 
   capturedPreferences = readPreferences();
   showSection("loading");
@@ -663,21 +673,48 @@ function resetToUpload() {
 
 /**
  * Copies a URL with ?id= to the clipboard and shows a toast.
+ * Falls back to a textarea-select approach for HTTP (non-secure) contexts,
+ * and as a last resort prompts the user with the URL to copy manually.
  */
 function handleCopyLink() {
   if (!currentRequestId) return;
-  const url = `${window.location.origin}${window.location.pathname}?id=${currentRequestId}`;
-  navigator.clipboard.writeText(url).then(() => {
-    showToast("Link copied!");
-  }).catch(() => {
-    const input = document.createElement("input");
-    input.value = url;
-    document.body.appendChild(input);
-    input.select();
-    document.execCommand("copy");
-    document.body.removeChild(input);
-    showToast("Link copied!");
-  });
+  const base = window.location.origin + window.location.pathname.replace(/\/$/, "");
+  const url = `${base}?id=${currentRequestId}`;
+
+  if (navigator.clipboard && window.isSecureContext) {
+    navigator.clipboard.writeText(url)
+      .then(() => showToast("Link copied to clipboard!"))
+      .catch(() => _fallbackCopy(url));
+  } else {
+    _fallbackCopy(url);
+  }
+}
+
+/**
+ * Copies text using a hidden textarea + execCommand. Falls back to window.prompt
+ * so the user can copy manually if execCommand is blocked.
+ *
+ * @param {string} text - The text to copy.
+ */
+function _fallbackCopy(text) {
+  const ta = document.createElement("textarea");
+  ta.value = text;
+  ta.style.cssText = "position:fixed;top:-9999px;left:-9999px;opacity:0";
+  document.body.appendChild(ta);
+  ta.focus();
+  ta.select();
+  try {
+    const ok = document.execCommand("copy");
+    if (ok) {
+      showToast("Link copied to clipboard!");
+    } else {
+      window.prompt("Copy this shareable link:", text);
+    }
+  } catch (_e) {
+    window.prompt("Copy this shareable link:", text);
+  } finally {
+    document.body.removeChild(ta);
+  }
 }
 
 /**
@@ -719,14 +756,6 @@ function initSettings() {
     }
   });
 
-  dom.toggleKeyVisibility.addEventListener("click", () => {
-    const isPassword = dom.settingsApiKey.type === "password";
-    dom.settingsApiKey.type = isPassword ? "text" : "password";
-    dom.toggleKeyVisibility.textContent = isPassword ? "🙈" : "👁";
-    dom.toggleKeyVisibility.setAttribute("aria-label",
-      isPassword ? "Hide API key" : "Show API key");
-  });
-
   dom.settingsSave.addEventListener("click", saveSettings);
   dom.settingsClear.addEventListener("click", clearSettings);
 }
@@ -748,60 +777,47 @@ function closeSettings() {
 }
 
 /**
- * Validates and persists settings to localStorage, then shows a status message.
+ * Validates and persists the API URL to localStorage, then shows a status message.
  */
 function saveSettings() {
   const rawUrl = dom.settingsApiUrl.value.trim().replace(/\/$/, "");
-  const rawKey = dom.settingsApiKey.value.trim();
 
-  if (rawUrl && !rawUrl.startsWith("https://") && !rawUrl.startsWith("http://")) {
-    _showSettingsStatus("API URL must start with https:// or http://", "error");
+  if (!rawUrl) {
+    _showSettingsStatus("API URL is required.", "error");
     return;
   }
 
-  if (rawUrl) {
-    localStorage.setItem(LS_KEY_API_URL, rawUrl);
-  } else {
-    localStorage.removeItem(LS_KEY_API_URL);
+  if (!rawUrl.startsWith("https://") && !rawUrl.startsWith("http://")) {
+    _showSettingsStatus("URL must start with https:// or http://", "error");
+    return;
   }
 
-  if (rawKey) {
-    localStorage.setItem(LS_KEY_API_KEY, rawKey);
-  } else {
-    localStorage.removeItem(LS_KEY_API_KEY);
-  }
-
+  localStorage.setItem(LS_KEY_API_URL, rawUrl);
   _updateSettingsIndicator();
   _showSettingsStatus("Settings saved.", "success");
   setTimeout(closeSettings, 900);
 }
 
 /**
- * Clears both localStorage keys and resets the fields to their defaults.
+ * Clears the saved API URL and resets the field.
  */
 function clearSettings() {
   localStorage.removeItem(LS_KEY_API_URL);
-  localStorage.removeItem(LS_KEY_API_KEY);
   _refreshSettingsFields();
   _updateSettingsIndicator();
   _showSettingsStatus("Reset to defaults.", "success");
 }
 
-/** Fills the settings inputs from localStorage (or shows empty if not set). */
+/** Fills the URL input from localStorage (or shows empty if not set). */
 function _refreshSettingsFields() {
   dom.settingsApiUrl.value = localStorage.getItem(LS_KEY_API_URL) || "";
-  dom.settingsApiKey.value = localStorage.getItem(LS_KEY_API_KEY) || "";
 }
 
 /**
- * Adds/removes the orange indicator dot on the gear button when custom
- * settings are active.
+ * Adds/removes the orange indicator dot on the gear button when a URL is saved.
  */
 function _updateSettingsIndicator() {
-  const hasCustom =
-    !!localStorage.getItem(LS_KEY_API_URL) ||
-    !!localStorage.getItem(LS_KEY_API_KEY);
-  dom.settingsBtn.classList.toggle("has-custom", hasCustom);
+  dom.settingsBtn.classList.toggle("has-custom", !!localStorage.getItem(LS_KEY_API_URL));
 }
 
 /**

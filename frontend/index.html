@@ -16,6 +16,8 @@
       2026-07-01 - Added preferences form, ingredient verification step,
                    how-to panel.
       2026-07-01 - Added settings panel (gear icon) for API URL + API key.
+      2026-07-01 - Updated how-to panel: clarified ingredients-only constraint
+                   and basic condiments list in step 1 and step 4.
 -->
 <!DOCTYPE html>
 <html lang="en">
@@ -63,9 +65,9 @@
         </div>
 
         <p class="settings-description">
-          Override the default API Gateway endpoint or add an API key for
-          protected deployments. Values are saved in your browser and applied
-          to every request.
+          Enter your API Gateway URL to connect the app to your AWS deployment.
+          This is required before you can upload photos. The value is saved in
+          your browser.
         </p>
 
         <div class="settings-field">
@@ -81,24 +83,6 @@
             autocomplete="off"
             spellcheck="false"
           />
-        </div>
-
-        <div class="settings-field">
-          <label class="settings-label" for="settings-api-key">
-            API Key
-            <span class="settings-hint">Required if API Gateway usage plan is enforced</span>
-          </label>
-          <div class="settings-password-row">
-            <input
-              type="password"
-              id="settings-api-key"
-              class="settings-input"
-              placeholder="Leave blank if not required"
-              autocomplete="off"
-              spellcheck="false"
-            />
-            <button type="button" id="toggle-key-visibility" class="btn-icon" aria-label="Toggle API key visibility">👁</button>
-          </div>
         </div>
 
         <div class="settings-footer">
@@ -122,28 +106,33 @@
             <span class="step-icon" aria-hidden="true">📷</span>
             <div>
               <strong>Take a photo</strong>
-              <span>Snap a picture of your fridge, pantry, or any ingredients you have on hand.</span>
+              <span>Snap a clear picture of your fridge, pantry, or countertop ingredients. Recipes will be
+                    built <em>only</em> from what's visible — plus basic condiments (salt, pepper, oil, butter,
+                    flour, sugar, dried herbs). No extra grocery runs needed.</span>
             </div>
           </li>
           <li class="how-to-step">
             <span class="step-icon" aria-hidden="true">✅</span>
             <div>
               <strong>Confirm ingredients</strong>
-              <span>Review what AI detected, remove anything incorrect, and add anything that was missed.</span>
+              <span>Review what AI detected, remove anything wrong, and add anything that was missed or
+                    out of frame.</span>
             </div>
           </li>
           <li class="how-to-step">
             <span class="step-icon" aria-hidden="true">⚙️</span>
             <div>
               <strong>Set your preferences</strong>
-              <span>Choose how many recipes you want, your maximum prep time, and any dietary restrictions.</span>
+              <span>Choose how many recipes you want (1–5), your maximum prep time, and any dietary
+                    restrictions.</span>
             </div>
           </li>
           <li class="how-to-step">
             <span class="step-icon" aria-hidden="true">🍽️</span>
             <div>
               <strong>Get your recipes</strong>
-              <span>AI generates personalised recipes with full ingredient lists and step-by-step instructions.</span>
+              <span>AI generates personalised recipes using <em>only your ingredients</em>, with full
+                    ingredient lists and step-by-step instructions.</span>
             </div>
           </li>
         </ol>
