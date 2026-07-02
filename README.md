@@ -46,12 +46,6 @@ Frontend polls GET /recipes/{id}                                         │
   • Shareable link via ?id= query parameter                             │
 ```
 
-### Status flow
-
-```
-PROCESSING → AWAITING_CONFIRMATION → GENERATING → COMPLETE | FAILED
-```
-
 ### AWS services
 
 | Service | Role |
