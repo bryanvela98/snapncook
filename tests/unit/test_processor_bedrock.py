@@ -8,6 +8,7 @@ Created: 2026-06-30
 Last Modified:
     2026-06-30 - File created: initial test suite for Bedrock + DynamoDB path.
     2026-07-01 - Removed unused `time` import.
+    2026-07-02 - Pass preferences={} arg to _generate_recipes to match updated signature.
 """
 
 import io
@@ -99,7 +100,7 @@ class TestGenerateRecipes:
 
     def test_returns_two_recipes(self):
         with self._stub_bedrock(_TWO_RECIPES):
-            result = _generate_recipes(["Tomato", "Egg"], "req-001")
+            result = _generate_recipes(["Tomato", "Egg"], {}, "req-001")
         assert len(result) == 2
         assert result[0]["name"] == "Tomato Omelette"
 
@@ -117,19 +118,19 @@ class TestGenerateRecipes:
             {"body": io.BytesIO(body_text.encode()), "contentType": "application/json"},
         )
         with stubber:
-            result = _generate_recipes(["Cheese"], "req-002")
+            result = _generate_recipes(["Cheese"], {}, "req-002")
         assert len(result) == 2
 
     def test_raises_on_fewer_than_two_recipes(self):
         one_recipe = {"recipes": [_TWO_RECIPES["recipes"][0]]}
         with self._stub_bedrock(one_recipe):
             with pytest.raises(ValueError, match="expected 2"):
-                _generate_recipes(["Tomato"], "req-003")
+                _generate_recipes(["Tomato"], {}, "req-003")
 
     def test_uses_fallback_ingredients_text_when_empty(self):
         """Empty ingredient list still produces a valid Bedrock call."""
         with self._stub_bedrock(_TWO_RECIPES):
-            result = _generate_recipes([], "req-004")
+            result = _generate_recipes([], {}, "req-004")
         assert len(result) == 2
 
 
