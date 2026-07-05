@@ -23,7 +23,13 @@
  *     2026-07-01 - requireApiConfigured() now checks localStorage only (ignores
  *                  config.js defaults): API URL must be explicitly saved in
  *                  settings panel before the app can run. API key removed.
+ *     2026-07-05 - Converted to an ES module so Motion (CDN ESM import) can
+ *                  drive fade/slide transitions between app sections. Added
+ *                  lucide.createIcons() calls after dynamic renders (recipe
+ *                  time badges) since Lucide only scans the DOM once.
  */
+
+import { animate } from "https://cdn.jsdelivr.net/npm/motion@11/+esm";
 
 /* ============================================================
    Constants
@@ -31,6 +37,7 @@
 
 const POLL_INTERVAL_MS   = 2000;
 const POLL_TIMEOUT_MS    = 60000;
+const SECTION_NAMES = ["upload", "loading", "verify", "generating", "results", "error"];
 
 const LS_KEY_API_URL = "snapcook_api_url";
 
@@ -160,6 +167,7 @@ function init() {
   };
 
   initSettings();
+  if (window.lucide) window.lucide.createIcons();
 
   // Range slider live update
   dom.recipeCountInput.addEventListener("input", () => {
@@ -197,17 +205,32 @@ function init() {
    ============================================================ */
 
 /**
- * Shows exactly one app section; hides all others.
+ * Shows exactly one app section, animating a fade/slide handoff with Motion
+ * instead of an instant hide/show swap.
  *
  * @param {"upload"|"loading"|"verify"|"generating"|"results"|"error"} name
  */
-function showSection(name) {
-  dom.uploadSection.classList.toggle("hidden",     name !== "upload");
-  dom.loadingSection.classList.toggle("hidden",    name !== "loading");
-  dom.verifySection.classList.toggle("hidden",     name !== "verify");
-  dom.generatingSection.classList.toggle("hidden", name !== "generating");
-  dom.resultsSection.classList.toggle("hidden",    name !== "results");
-  dom.errorSection.classList.toggle("hidden",      name !== "error");
+async function showSection(name) {
+  const target = dom[`${name}Section`];
+  const outgoing = SECTION_NAMES
+    .map((n) => dom[`${n}Section`])
+    .find((el) => el !== target && !el.classList.contains("hidden"));
+
+  if (outgoing) {
+    await animate(
+      outgoing,
+      { opacity: [1, 0], transform: ["translateY(0)", "translateY(6px)"] },
+      { duration: 0.15, easing: "ease-in" }
+    ).finished;
+    outgoing.classList.add("hidden");
+  }
+
+  target.classList.remove("hidden");
+  animate(
+    target,
+    { opacity: [0, 1], transform: ["translateY(6px)", "translateY(0)"] },
+    { duration: 0.25, easing: "ease-out" }
+  );
 }
 
 /**
@@ -529,6 +552,7 @@ function renderResults(data) {
   const recipes = Array.isArray(data.recipes) ? data.recipes : [];
   recipes.forEach((recipe, i) => dom.recipeGrid.appendChild(buildRecipeCard(recipe, i + 1)));
 
+  if (window.lucide) window.lucide.createIcons();
   showSection("results");
 }
 
@@ -610,21 +634,31 @@ function buildTimeBadges(prepTime, cookTime) {
   if (!prepTime && !cookTime) return null;
   const row = document.createElement("div");
   row.className = "recipe-time-badges";
-  if (prepTime) {
-    const b = Object.assign(document.createElement("span"), {
-      className: "time-badge",
-      textContent: `⏱ Prep: ${prepTime}`,
-    });
-    row.appendChild(b);
-  }
-  if (cookTime) {
-    const b = Object.assign(document.createElement("span"), {
-      className: "time-badge",
-      textContent: `🍳 Cook: ${cookTime}`,
-    });
-    row.appendChild(b);
-  }
+  if (prepTime) row.appendChild(buildTimeBadge("clock", `Prep: ${prepTime}`));
+  if (cookTime) row.appendChild(buildTimeBadge("flame", `Cook: ${cookTime}`));
   return row;
+}
+
+/**
+ * Builds a single icon + label time badge.
+ *
+ * @param {string} iconName - Lucide icon name.
+ * @param {string} label
+ * @returns {HTMLElement}
+ */
+function buildTimeBadge(iconName, label) {
+  const badge = document.createElement("span");
+  badge.className = "time-badge";
+
+  const icon = document.createElement("i");
+  icon.setAttribute("data-lucide", iconName);
+  icon.setAttribute("width", "14");
+  icon.setAttribute("height", "14");
+  icon.setAttribute("aria-hidden", "true");
+
+  badge.appendChild(icon);
+  badge.appendChild(document.createTextNode(label));
+  return badge;
 }
 
 /* ============================================================
