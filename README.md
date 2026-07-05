@@ -46,6 +46,13 @@ Frontend polls GET /recipes/{id}                                         │
   • Shareable link via ?id= query parameter                             │
 ```
 
+### Diagrams
+
+| Diagram | Description |
+|---|---|
+| [High-Level Architecture](docs/diagrams/HighLevelArchitectureDiagram.png) | End-to-end AWS component/service layout |
+| [Data Sequence Diagram](docs/diagrams/DataSequenceDiagram.png) | Request flow across ingest → detect → confirm → generate |
+
 ### AWS services
 
 | Service | Role |
