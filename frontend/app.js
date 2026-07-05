@@ -27,6 +27,10 @@
  *                  drive fade/slide transitions between app sections. Added
  *                  lucide.createIcons() calls after dynamic renders (recipe
  *                  time badges) since Lucide only scans the DOM once.
+ *     2026-07-05 - Reject non-JPEG/PNG uploads client-side (file picker and
+ *                  drag-and-drop) since Rekognition DetectLabels only accepts
+ *                  those formats and was failing every request with
+ *                  InvalidImageFormatException on other types (e.g. WEBP).
  */
 
 import { animate } from "https://cdn.jsdelivr.net/npm/motion@11/+esm";
@@ -38,6 +42,9 @@ import { animate } from "https://cdn.jsdelivr.net/npm/motion@11/+esm";
 const POLL_INTERVAL_MS   = 2000;
 const POLL_TIMEOUT_MS    = 60000;
 const SECTION_NAMES = ["upload", "loading", "verify", "generating", "results", "error"];
+
+// Rekognition DetectLabels only accepts JPEG and PNG.
+const SUPPORTED_IMAGE_TYPES = ["image/jpeg", "image/png"];
 
 const LS_KEY_API_URL = "snapcook_api_url";
 
@@ -251,7 +258,15 @@ function setLoadingText(message) {
  */
 function handleFileSelect(event) {
   const file = event.target.files[0];
-  if (file) showFilePreview(file);
+  if (!file) return;
+
+  if (!SUPPORTED_IMAGE_TYPES.includes(file.type)) {
+    event.target.value = "";
+    showToast("Unsupported file type. Please upload a JPEG or PNG image.");
+    return;
+  }
+
+  showFilePreview(file);
 }
 
 /**
@@ -884,11 +899,16 @@ function setupDropZone() {
     e.preventDefault();
     zone.classList.remove("drag-over");
     const file = e.dataTransfer.files[0];
-    if (file && file.type.startsWith("image/")) {
-      const dt = new DataTransfer();
-      dt.items.add(file);
-      dom.fileInput.files = dt.files;
-      showFilePreview(file);
+    if (!file) return;
+
+    if (!SUPPORTED_IMAGE_TYPES.includes(file.type)) {
+      showToast("Unsupported file type. Please upload a JPEG or PNG image.");
+      return;
     }
+
+    const dt = new DataTransfer();
+    dt.items.add(file);
+    dom.fileInput.files = dt.files;
+    showFilePreview(file);
   });
 }
