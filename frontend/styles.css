@@ -3,7 +3,10 @@
  *              (with preferences), loading, verify (ingredient confirmation),
  *              generating, and results. How-to panel is always visible.
  *              Warm food-themed palette — greens and oranges on a neutral
- *              background. No external CSS frameworks or fonts.
+ *              background. Loads Open Props (CDN, linked in index.html) for
+ *              shadow/gradient/easing tokens and Fraunces (Google Fonts) as
+ *              the display face for headings — body text stays on the system
+ *              stack. Lucide icons (CDN) replace emoji throughout.
  * Last Modified By: bvela
  * Created: 2026-07-01
  * Last Modified:
@@ -12,6 +15,10 @@
  *                  panel styles.
  *     2026-07-01 - Added settings panel (gear icon, overlay, fields).
  *     2026-07-01 - Added .settings-required for required-field asterisk markers.
+ *     2026-07-05 - Added --font-display (Fraunces) token, layered Open Props
+ *                  shadow/gradient/easing tokens with graceful fallbacks,
+ *                  added icon sizing/color rules for Lucide SVGs, added
+ *                  recipe-card hover lift.
  */
 
 /* ============================================================
@@ -39,11 +46,18 @@
   --radius-lg:  12px;
   --radius-xl:  16px;
 
-  --shadow-sm:  0 1px 2px rgba(0, 0, 0, 0.06);
-  --shadow-md:  0 1px 3px rgba(0, 0, 0, 0.08), 0 1px 2px rgba(0, 0, 0, 0.04);
+  /* Open Props ships --shadow-1..6 and --ease-*; fall back to the original
+     hand-tuned values if the CDN stylesheet fails to load. */
+  --shadow-sm:  var(--shadow-2, 0 1px 2px rgba(0, 0, 0, 0.06));
+  --shadow-md:  var(--shadow-3, 0 1px 3px rgba(0, 0, 0, 0.08), 0 1px 2px rgba(0, 0, 0, 0.04));
+  --shadow-lg:  var(--shadow-4, 0 4px 10px rgba(0, 0, 0, 0.1));
+  --ease-out:   var(--ease-out-3, ease-out);
+  --ease-in:    var(--ease-in-3, ease-in);
+  --accent-gradient: linear-gradient(135deg, var(--color-primary), var(--color-accent));
 
   --font-sans: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto,
                "Helvetica Neue", Arial, sans-serif;
+  --font-display: "Fraunces", Georgia, "Times New Roman", serif;
 }
 
 /* ============================================================
@@ -86,11 +100,17 @@ body {
 .header-brand { text-align: center; flex: 1; }
 
 .site-header h1 {
-  font-size: 1.5rem;
+  font-family: var(--font-display);
+  font-size: 1.625rem;
   font-weight: 700;
   color: var(--color-primary);
-  letter-spacing: -0.02em;
+  letter-spacing: -0.01em;
+  display: inline-flex;
+  align-items: center;
+  gap: 0.375rem;
 }
+
+.site-header h1 svg.lucide { color: var(--color-accent); }
 
 .site-header p {
   font-size: 0.875rem;
@@ -311,6 +331,16 @@ main {
    ============================================================ */
 
 .hidden { display: none !important; }
+
+/* ============================================================
+   Icons (Lucide SVGs — colored via currentColor on the wrapper)
+   ============================================================ */
+
+svg.lucide {
+  stroke-width: 1.75;
+  vertical-align: -0.15em;
+  flex-shrink: 0;
+}
 
 .sr-only {
   position: absolute; width: 1px; height: 1px; padding: 0; margin: -1px;
@@ -631,7 +661,8 @@ main {
 }
 
 .verify-header h2 {
-  font-size: 1.125rem;
+  font-family: var(--font-display);
+  font-size: 1.25rem;
   font-weight: 700;
 }
 
@@ -772,7 +803,7 @@ main {
   gap: 0.75rem;
 }
 
-.results-header h2 { font-size: 1.25rem; font-weight: 700; }
+.results-header h2 { font-family: var(--font-display); font-size: 1.375rem; font-weight: 700; }
 
 .results-actions { display: flex; gap: 0.5rem; }
 
@@ -818,6 +849,7 @@ main {
 }
 
 .recipe-card {
+  position: relative;
   background: var(--color-surface);
   border: 1px solid var(--color-border);
   border-radius: var(--radius-xl);
@@ -826,6 +858,21 @@ main {
   flex-direction: column;
   gap: 1rem;
   box-shadow: var(--shadow-md);
+  overflow: hidden;
+  transition: transform 0.2s var(--ease-out), box-shadow 0.2s var(--ease-out);
+}
+
+.recipe-card::before {
+  content: "";
+  position: absolute;
+  top: 0; left: 0; right: 0;
+  height: 3px;
+  background: var(--accent-gradient);
+}
+
+.recipe-card:hover {
+  transform: translateY(-3px);
+  box-shadow: var(--shadow-lg);
 }
 
 .recipe-card-header { display: flex; flex-direction: column; gap: 0.5rem; }
@@ -839,7 +886,8 @@ main {
 }
 
 .recipe-name {
-  font-size: 1.125rem;
+  font-family: var(--font-display);
+  font-size: 1.25rem;
   font-weight: 700;
   line-height: 1.3;
 }
