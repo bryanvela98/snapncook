@@ -2,7 +2,7 @@
 /tasks
 .claude
 CLAUDE.md
-/docs
+/docs/*.md
 *.pdf
 
 # Terraform
