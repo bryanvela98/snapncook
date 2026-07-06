@@ -6,46 +6,6 @@ Snap & Cook uses Amazon Rekognition to detect ingredients in your photo, lets yo
 
 ---
 
-## Architecture
-
-```
-Browser / S3 Static Frontend
-        │
-        ▼
-POST /analyze  ──────────────────────────────────────────────────────────┐
-  API Gateway (HTTP API v2, throttled 100 rps / 200 burst)              │
-        │                                                                │
-        ▼                                                                │
-Lambda: ingest_handler                                                   │
-  • Parses multipart/form-data, stores raw image → S3 (images bucket)   │
-  • Writes DynamoDB: { requestId, status: PROCESSING }                  │
-  • Publishes SQS: { requestId, s3_key, phase: "detect" }               │
-  • Returns 202 { requestId }  ───────────────────────────────────────► │
-                                                                         │
-SQS Job Queue ──► Lambda: processor_handler (phase = detect)            │
-  • Fetches image from S3                                                │
-  • Rekognition DetectLabels → filters food labels                      │
-  • DynamoDB: status = AWAITING_CONFIRMATION, ingredients = [...]        │
-                                                                         │
-Frontend polls GET /recipes/{id}                                         │
-  • Shows ingredient verification UI (add / remove labels)              │
-  • User sets preferences: recipe count (1–5), max prep time, dietary   │
-                                                                         │
-POST /recipes/{id}/confirm                                               │
-  • Lambda: confirm_handler                                              │
-  • DynamoDB: status = GENERATING, confirmed_ingredients, preferences   │
-  • Publishes SQS: { requestId, phase: "generate" }                     │
-                                                                         │
-SQS Job Queue ──► Lambda: processor_handler (phase = generate)          │
-  • Reads confirmed_ingredients + preferences from DynamoDB             │
-  • Bedrock Nova Lite → generates N recipes with instructions           │
-  • DynamoDB: status = COMPLETE, recipes = [...]                         │
-                                                                         │
-Frontend polls GET /recipes/{id}                                         │
-  • Renders recipe cards (name, ingredients, numbered steps, time badge)│
-  • Shareable link via ?id= query parameter                             │
-```
-
 ### Diagrams
 
 | Diagram | Description |
