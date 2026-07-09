@@ -31,10 +31,14 @@
  *                  drag-and-drop) since Rekognition DetectLabels only accepts
  *                  those formats and was failing every request with
  *                  InvalidImageFormatException on other types (e.g. WEBP).
- *     2026-07-09 - Added compressImage(): downscales + re-encodes as JPEG
- *                  before upload so phone photos (often 8-15+ MB) stay under
- *                  API Gateway's hard 10 MB payload limit, which was rejecting
- *                  uploads with a 413 before they reached the Lambda.
+ *     2026-07-09 - Added compressImage(): re-encodes as JPEG before upload so
+ *                  phone photos (often 8-15+ MB) stay under API Gateway's
+ *                  hard 10 MB payload limit, which was rejecting uploads with
+ *                  a 413 before they reached the Lambda.
+ *     2026-07-09 - Made compressImage() adaptive (quality-step loop, only
+ *                  downscaling dimensions past 3000px if still too large)
+ *                  after the initial fixed 1600px/0.8 downscale degraded
+ *                  Rekognition's ingredient detection accuracy too much.
  */
 
 import { animate } from "https://cdn.jsdelivr.net/npm/motion@11/+esm";
@@ -51,10 +55,15 @@ const SECTION_NAMES = ["upload", "loading", "verify", "generating", "results", "
 const SUPPORTED_IMAGE_TYPES = ["image/jpeg", "image/png"];
 
 // API Gateway (HTTP API) has a hard, non-configurable 10 MB request payload
-// limit. Phone camera photos routinely exceed that, so uploads are downscaled
-// and re-encoded as JPEG client-side before the /analyze POST.
-const MAX_IMAGE_DIMENSION = 1600; // px, longest edge
-const JPEG_QUALITY = 0.8;
+// limit. Phone camera photos routinely exceed that, so uploads are re-encoded
+// as JPEG client-side before the /analyze POST. Target leaves headroom below
+// the 10 MB ceiling for multipart/form-data framing overhead.
+const MAX_UPLOAD_BYTES = 8 * 1024 * 1024;
+// Longest edge is only capped if the photo is huge — Rekognition's label
+// detection loses accuracy on small ingredients/text once detail is thrown
+// away, so this ceiling is well above what any size-driven downscale needs.
+const MAX_IMAGE_DIMENSION = 3000;
+const JPEG_QUALITY_STEPS = [0.92, 0.85, 0.75, 0.6];
 
 const LS_KEY_API_URL = "snapcook_api_url";
 
@@ -313,34 +322,20 @@ function readPreferences() {
 }
 
 /**
- * Downscales and re-encodes an image as JPEG so the upload stays under
- * API Gateway's hard 10 MB payload limit (phone photos routinely exceed it).
+ * Decodes a file into an HTMLImageElement.
  *
- * @param {File} file - Original JPEG/PNG file selected by the user.
- * @returns {Promise<Blob>} JPEG-encoded, resized image blob.
+ * @param {File} file
+ * @returns {Promise<HTMLImageElement>}
  */
-function compressImage(file) {
+function loadImage(file) {
   return new Promise((resolve, reject) => {
     const img = new Image();
     const objectUrl = URL.createObjectURL(file);
 
     img.onload = () => {
       URL.revokeObjectURL(objectUrl);
-
-      const scale = Math.min(1, MAX_IMAGE_DIMENSION / Math.max(img.width, img.height));
-      const canvas = document.createElement("canvas");
-      canvas.width = Math.round(img.width * scale);
-      canvas.height = Math.round(img.height * scale);
-
-      canvas.getContext("2d").drawImage(img, 0, 0, canvas.width, canvas.height);
-
-      canvas.toBlob(
-        (blob) => (blob ? resolve(blob) : reject(new Error("Image compression failed."))),
-        "image/jpeg",
-        JPEG_QUALITY
-      );
+      resolve(img);
     };
-
     img.onerror = () => {
       URL.revokeObjectURL(objectUrl);
       reject(new Error("Could not load image for compression."));
@@ -348,6 +343,58 @@ function compressImage(file) {
 
     img.src = objectUrl;
   });
+}
+
+/**
+ * Encodes a canvas to a JPEG blob at the given quality.
+ *
+ * @param {HTMLCanvasElement} canvas
+ * @param {number} quality - 0-1.
+ * @returns {Promise<Blob>}
+ */
+function canvasToJpeg(canvas, quality) {
+  return new Promise((resolve, reject) => {
+    canvas.toBlob(
+      (blob) => (blob ? resolve(blob) : reject(new Error("Image compression failed."))),
+      "image/jpeg",
+      quality
+    );
+  });
+}
+
+/**
+ * Re-encodes an image as JPEG, only reducing quality/resolution as far as
+ * needed to fit under MAX_UPLOAD_BYTES. Only downscales dimensions if the
+ * photo exceeds MAX_IMAGE_DIMENSION — most phone photos need no resize at
+ * all, since a single high-quality JPEG pass is usually already small enough.
+ * Preserving resolution/detail matters here: Rekognition's label detection
+ * accuracy drops noticeably once an image is downscaled/compressed too hard.
+ *
+ * @param {File} file - Original JPEG/PNG file selected by the user.
+ * @returns {Promise<Blob>} JPEG-encoded image blob, at or under the target size.
+ */
+async function compressImage(file) {
+  const img = await loadImage(file);
+
+  const scale = Math.min(1, MAX_IMAGE_DIMENSION / Math.max(img.width, img.height));
+  const canvas = document.createElement("canvas");
+  canvas.width = Math.round(img.width * scale);
+  canvas.height = Math.round(img.height * scale);
+  canvas.getContext("2d").drawImage(img, 0, 0, canvas.width, canvas.height);
+
+  let blob = null;
+  for (const quality of JPEG_QUALITY_STEPS) {
+    blob = await canvasToJpeg(canvas, quality);
+    if (blob.size <= MAX_UPLOAD_BYTES) return blob;
+  }
+
+  // Still too large at the lowest quality step (extremely high-resolution
+  // source) — fall back to a further resolution cut at that same quality.
+  const fallbackScale = Math.sqrt(MAX_UPLOAD_BYTES / blob.size);
+  canvas.width = Math.round(canvas.width * fallbackScale);
+  canvas.height = Math.round(canvas.height * fallbackScale);
+  canvas.getContext("2d").drawImage(img, 0, 0, canvas.width, canvas.height);
+  return canvasToJpeg(canvas, JPEG_QUALITY_STEPS[JPEG_QUALITY_STEPS.length - 1]);
 }
 
 /**
