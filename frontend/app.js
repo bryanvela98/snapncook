@@ -31,6 +31,10 @@
  *                  drag-and-drop) since Rekognition DetectLabels only accepts
  *                  those formats and was failing every request with
  *                  InvalidImageFormatException on other types (e.g. WEBP).
+ *     2026-07-09 - Added compressImage(): downscales + re-encodes as JPEG
+ *                  before upload so phone photos (often 8-15+ MB) stay under
+ *                  API Gateway's hard 10 MB payload limit, which was rejecting
+ *                  uploads with a 413 before they reached the Lambda.
  */
 
 import { animate } from "https://cdn.jsdelivr.net/npm/motion@11/+esm";
@@ -45,6 +49,12 @@ const SECTION_NAMES = ["upload", "loading", "verify", "generating", "results", "
 
 // Rekognition DetectLabels only accepts JPEG and PNG.
 const SUPPORTED_IMAGE_TYPES = ["image/jpeg", "image/png"];
+
+// API Gateway (HTTP API) has a hard, non-configurable 10 MB request payload
+// limit. Phone camera photos routinely exceed that, so uploads are downscaled
+// and re-encoded as JPEG client-side before the /analyze POST.
+const MAX_IMAGE_DIMENSION = 1600; // px, longest edge
+const JPEG_QUALITY = 0.8;
 
 const LS_KEY_API_URL = "snapcook_api_url";
 
@@ -303,6 +313,44 @@ function readPreferences() {
 }
 
 /**
+ * Downscales and re-encodes an image as JPEG so the upload stays under
+ * API Gateway's hard 10 MB payload limit (phone photos routinely exceed it).
+ *
+ * @param {File} file - Original JPEG/PNG file selected by the user.
+ * @returns {Promise<Blob>} JPEG-encoded, resized image blob.
+ */
+function compressImage(file) {
+  return new Promise((resolve, reject) => {
+    const img = new Image();
+    const objectUrl = URL.createObjectURL(file);
+
+    img.onload = () => {
+      URL.revokeObjectURL(objectUrl);
+
+      const scale = Math.min(1, MAX_IMAGE_DIMENSION / Math.max(img.width, img.height));
+      const canvas = document.createElement("canvas");
+      canvas.width = Math.round(img.width * scale);
+      canvas.height = Math.round(img.height * scale);
+
+      canvas.getContext("2d").drawImage(img, 0, 0, canvas.width, canvas.height);
+
+      canvas.toBlob(
+        (blob) => (blob ? resolve(blob) : reject(new Error("Image compression failed."))),
+        "image/jpeg",
+        JPEG_QUALITY
+      );
+    };
+
+    img.onerror = () => {
+      URL.revokeObjectURL(objectUrl);
+      reject(new Error("Could not load image for compression."));
+    };
+
+    img.src = objectUrl;
+  });
+}
+
+/**
  * Handles form submission: POSTs the image to /analyze and starts polling.
  *
  * @param {Event} event
@@ -320,12 +368,14 @@ async function handleUpload(event) {
 
   capturedPreferences = readPreferences();
   showSection("loading");
-  setLoadingText("Uploading image…");
-
-  const formData = new FormData();
-  formData.append("image", file);
+  setLoadingText("Preparing image…");
 
   try {
+    const compressed = await compressImage(file);
+    const formData = new FormData();
+    formData.append("image", compressed, "photo.jpg");
+
+    setLoadingText("Uploading image…");
     const response = await apiFetch("/analyze", {
       method: "POST",
       body: formData,
